@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  REFERRAL_REWARD
+  BALANCE_ADJUSTMENT
+  GOLD_PURCHASE
+  GOLD_SALE
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+model User {
+  id         String   @id @default(cuid())
+  authUserId String   @unique
+  email      String?  @unique
+  phone      String?  @unique
+  fullName   String?
+  role       UserRole @default(USER)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  wallet       Wallet?
+  goldHolding  GoldHolding?
+  transactions Transaction[]
+}
+
+model Wallet {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  portfolioValue  Decimal @default(0) @db.Decimal(20, 2)
+  cashBalance     Decimal @default(0) @db.Decimal(20, 2)
+  referralBalance Decimal @default(0) @db.Decimal(20, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GoldHolding {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  quantity Decimal @default(0) @db.Decimal(20, 8)
+  value    Decimal @default(0) @db.Decimal(20, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Transaction {
+  id     String @id @default(cuid())
+  userId String
+
+  type   TransactionType
+  status TransactionStatus @default(PENDING)
+
+  amount   Decimal @db.Decimal(20, 2)
+  currency String  @default("USD")
+
+  description String?
+  reference   String  @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
