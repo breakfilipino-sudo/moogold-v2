@@ -7,6 +7,63 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id           String        @id @default(cuid())
+  authUserId   String        @unique
+  email        String?       @unique
+  phone        String?       @unique
+  fullName     String?
+  role         UserRole      @default(USER)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  goldHolding  GoldHolding?
+  transactions Transaction[]
+  wallet       Wallet?
+
+  adminAdjustments BalanceAdjustment[] @relation("AdminAdjustments")
+userAdjustments  BalanceAdjustment[] @relation("UserAdjustments")
+}
+
+model Wallet {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  portfolioValue  Decimal  @default(0) @db.Decimal(20, 2)
+  cashBalance     Decimal  @default(0) @db.Decimal(20, 2)
+  referralBalance Decimal  @default(0) @db.Decimal(20, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GoldHolding {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  quantity  Decimal  @default(0) @db.Decimal(20, 8)
+  value     Decimal  @default(0) @db.Decimal(20, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Transaction {
+  id          String            @id @default(cuid())
+  userId      String
+  type        TransactionType
+  status      TransactionStatus @default(PENDING)
+  amount      Decimal           @db.Decimal(20, 2)
+  currency    String            @default("USD")
+  description String?
+  reference   String            @unique
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
 enum UserRole {
   USER
   ADMIN
@@ -28,69 +85,39 @@ enum TransactionStatus {
   REJECTED
   CANCELLED
 }
-
-model User {
-  id         String   @id @default(cuid())
-  authUserId String   @unique
-  email      String?  @unique
-  phone      String?  @unique
-  fullName   String?
-  role       UserRole @default(USER)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  wallet       Wallet?
-  goldHolding  GoldHolding?
-  transactions Transaction[]
+enum BalanceType {
+  CASH
+  REFERRAL
+  PORTFOLIO
 }
 
-model Wallet {
-  id     String @id @default(cuid())
-  userId String @unique
-
-  portfolioValue  Decimal @default(0) @db.Decimal(20, 2)
-  cashBalance     Decimal @default(0) @db.Decimal(20, 2)
-  referralBalance Decimal @default(0) @db.Decimal(20, 2)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+enum AdjustmentDirection {
+  CREDIT
+  DEBIT
 }
 
-model GoldHolding {
-  id     String @id @default(cuid())
-  userId String @unique
+model BalanceAdjustment {
+  id String @id @default(cuid())
 
-  quantity Decimal @default(0) @db.Decimal(20, 8)
-  value    Decimal @default(0) @db.Decimal(20, 2)
+  userId  String
+  adminId String
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Transaction {
-  id     String @id @default(cuid())
-  userId String
-
-  type   TransactionType
-  status TransactionStatus @default(PENDING)
+  balanceType BalanceType
+  direction   AdjustmentDirection
 
   amount   Decimal @db.Decimal(20, 2)
   currency String  @default("USD")
 
-  description String?
-  reference   String  @unique
+  reason    String
+  reference String @unique
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User @relation("UserAdjustments", fields: [userId], references: [id], onDelete: Cascade)
+  admin User @relation("AdminAdjustments", fields: [adminId], references: [id], onDelete: Restrict)
 
   @@index([userId])
-  @@index([status])
-  @@index([type])
+  @@index([adminId])
+  @@index([balanceType])
   @@index([createdAt])
 }
