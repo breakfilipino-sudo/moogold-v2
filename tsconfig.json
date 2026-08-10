@@ -19,10 +19,9 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
-    },
+  "@/*": ["./*"],
+  "@generated/*": ["./generated/prisma/*"]
+},
     "plugins": [
       {
         "name": "next"
