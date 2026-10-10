@@ -8,31 +8,63 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  authUserId   String        @unique
-  email        String?       @unique
-  phone        String?       @unique
-  fullName     String?
-  role         UserRole      @default(USER)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  goldHolding  GoldHolding?
-  transactions Transaction[]
-  wallet       Wallet?
+  id                           String                @id @default(cuid())
+  authUserId                   String                @unique
+  email                        String?               @unique
+  phone                        String?               @unique
+  countryCode                  String?
+  fullName                     String?
+  pinHash                      String?
+  pinCreatedAt                 DateTime?
+  role                         UserRole              @default(USER)
+  createdAt                    DateTime              @default(now())
+  updatedAt                    DateTime              @updatedAt
+  referralCode                 String?               @unique
+  nickname                     String?
+  profilePhotoPath             String?
+  accountStatus                AccountStatus         @default(ACTIVE)
+  closureRequestedAt           DateTime?
+  closedAt                     DateTime?
+  adminAdjustments             BalanceAdjustment[]   @relation("AdminAdjustments")
+  userAdjustments              BalanceAdjustment[]   @relation("UserAdjustments")
+  cryptoBalances               CryptoBalance[]
+  cryptoDeposits               CryptoDeposit[]
+  cryptoWithdrawals            CryptoWithdrawal[]
+  giftCardReviews              GiftCardSubmission[]  @relation("GiftCardReviewer")
+  giftCardSubmissions          GiftCardSubmission[]
+  goldHolding                  GoldHolding?
+  referredBy                   Referral?             @relation("ReferredUser")
+  referralsMade                Referral[]            @relation("Referrer")
+  assignedSupportConversations SupportConversation[] @relation("SupportAssignee")
+  supportConversations         SupportConversation[] @relation("SupportCustomer")
+  supportMessages              SupportMessage[]      @relation("SupportMessageAuthor")
+  approvedTransactions         Transaction[]         @relation("TransactionApprover")
+  transactions                 Transaction[]
+  verificationsReviewed        UserVerification[]    @relation("VerificationReviewer")
+  verification                 UserVerification?
+  wallet                       Wallet?
+  notifications                Notification[]
+  wealthInvestments            WealthInvestment[]
+  wealthFundings               WealthFunding[]
+  wealthFundingReviews         WealthFunding[]       @relation("WealthFundingReviewer")
+  preferredLanguage String @default("en")
 
-  adminAdjustments BalanceAdjustment[] @relation("AdminAdjustments")
-userAdjustments  BalanceAdjustment[] @relation("UserAdjustments")
+  @@index([accountStatus])
 }
 
 model Wallet {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  portfolioValue  Decimal  @default(0) @db.Decimal(20, 2)
-  cashBalance     Decimal  @default(0) @db.Decimal(20, 2)
-  referralBalance Decimal  @default(0) @db.Decimal(20, 2)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String              @id @default(cuid())
+  userId          String              @unique
+  portfolioValue  Decimal             @default(0) @db.Decimal(20, 2)
+  cashBalance     Decimal             @default(0) @db.Decimal(20, 2)
+  referralBalance Decimal             @default(0) @db.Decimal(20, 2)
+  currency        String              @default("USD")
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledgerEntries   WalletLedgerEntry[]
+
+  @@index([createdAt])
 }
 
 model GoldHolding {
@@ -40,33 +72,704 @@ model GoldHolding {
   userId    String   @unique
   quantity  Decimal  @default(0) @db.Decimal(20, 8)
   value     Decimal  @default(0) @db.Decimal(20, 2)
+  currency  String   @default("USD")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model GoldMarketSnapshot {
+  id         String   @id @default(cuid())
+  price      Decimal  @db.Decimal(20, 8)
+  source     String
+  capturedAt DateTime @default(now())
+
+  @@index([capturedAt])
+}
+
 model Transaction {
-  id          String            @id @default(cuid())
-  userId      String
-  type        TransactionType
-  status      TransactionStatus @default(PENDING)
-  amount      Decimal           @db.Decimal(20, 2)
-  currency    String            @default("USD")
-  description String?
-  reference   String            @unique
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String              @id @default(cuid())
+  userId             String
+  type               TransactionType     @default(DEPOSIT)
+  status             TransactionStatus   @default(PENDING)
+  balanceType        BalanceType?
+  amount             Decimal             @db.Decimal(20, 2)
+  currency           String              @default("USD")
+  usdAmount          Decimal?            @db.Decimal(20, 2)
+  exchangeRate       Decimal?            @db.Decimal(20, 8)
+  description        String?
+  reference          String              @unique
+  approvedById       String?
+  approvedAt         DateTime?
+  rejectionReason    String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  balanceAdjustment  BalanceAdjustment?
+  depositDetails     DepositDetails?
+  giftCardSubmission GiftCardSubmission?
+  approvedBy         User?               @relation("TransactionApprover", fields: [approvedById], references: [id])
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledgerEntry        WalletLedgerEntry?
+  withdrawalDetails  WithdrawalDetails?
 
   @@index([userId])
   @@index([status])
   @@index([type])
+  @@index([balanceType])
   @@index([createdAt])
+  @@index([approvedById])
+  @@index([userId, createdAt])
+}
+
+model WalletLedgerEntry {
+  id            String          @id @default(cuid())
+  walletId      String
+  transactionId String          @unique
+  balanceType   BalanceType
+  direction     LedgerDirection
+  amount        Decimal         @db.Decimal(20, 2)
+  currency      String          @default("USD")
+  balanceBefore Decimal         @db.Decimal(20, 2)
+  balanceAfter  Decimal         @db.Decimal(20, 2)
+  description   String?
+  createdAt     DateTime        @default(now())
+  transaction   Transaction     @relation(fields: [transactionId], references: [id])
+  wallet        Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId])
+  @@index([balanceType])
+  @@index([direction])
+  @@index([createdAt])
+}
+
+model DepositDetails {
+  id                String        @id
+  transactionId     String        @unique
+  method            DepositMethod @default(BANK_TRANSFER)
+  countryCode       String
+  bankName          String
+  senderName        String?
+  senderAccount     String?
+  externalReference String?
+  notes             String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  transaction       Transaction   @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([method])
+  @@index([countryCode])
+  @@index([bankName])
+  @@index([externalReference])
+}
+
+model WithdrawalDetails {
+  id                String           @id
+  transactionId     String             @unique
+  method            WithdrawalMethod @default(BANK_TRANSFER)
+  bankName          String?
+  bankAccountName   String?
+  bankAccountNumber String?
+  externalReference String?
+  notes             String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  routingNumber     String?
+  transaction       Transaction      @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([method])
+  @@index([externalReference])
+}
+
+model BalanceAdjustment {
+  id            String              @id @default(cuid())
+  userId        String
+  adminId       String
+  transactionId String              @unique
+  balanceType   BalanceType
+  direction     AdjustmentDirection
+  amount        Decimal             @db.Decimal(20, 2)
+  currency      String              @default("USD")
+  reason        String
+  reference     String              @unique
+  createdAt     DateTime            @default(now())
+  admin         User                @relation("AdminAdjustments", fields: [adminId], references: [id])
+  transaction   Transaction         @relation(fields: [transactionId], references: [id])
+  user          User                @relation("UserAdjustments", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([adminId])
+  @@index([balanceType])
+  @@index([direction])
+  @@index([createdAt])
+}
+
+model Referral {
+  id             String         @id @default(cuid())
+  referrerId     String
+  referredUserId String         @unique
+  status         ReferralStatus @default(PENDING)
+  rewardAmount   Decimal?       @db.Decimal(20, 2)
+  rewardCurrency String         @default("USD")
+  qualifiedAt    DateTime?
+  rewardedAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  referredUser   User           @relation("ReferredUser", fields: [referredUserId], references: [id])
+  referrer       User           @relation("Referrer", fields: [referrerId], references: [id])
+
+  @@index([referrerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model CryptoBalance {
+  id            String              @id @default(cuid())
+  userId        String
+  asset         CryptoAsset
+  network       CryptoNetwork
+  balance       Decimal             @default(0) @db.Decimal(30, 18)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deposits      CryptoDeposit[]
+  ledgerEntries CryptoLedgerEntry[]
+  withdrawals   CryptoWithdrawal[]
+
+  @@unique([userId, asset, network])
+  @@index([userId])
+  @@index([asset])
+  @@index([network])
+}
+
+model CryptoDeposit {
+  id               String              @id @default(cuid())
+  userId           String
+  cryptoBalanceId  String
+  asset            CryptoAsset
+  network          CryptoNetwork
+  amount           Decimal?            @db.Decimal(30, 18)
+  usdAmount        Decimal?            @db.Decimal(20, 2)
+  exchangeRate     Decimal?            @db.Decimal(20, 8)
+  receivingAddress String
+  transactionHash  String?
+  senderAddress    String?
+  blockNumber      String?
+  confirmations    Int?
+  status           CryptoDepositStatus @default(PENDING)
+  description      String?
+  rejectionReason  String?
+  reviewedById     String?
+  reviewedAt       DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  cryptoBalance    CryptoBalance       @relation(fields: [cryptoBalanceId], references: [id])
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledgerEntry      CryptoLedgerEntry?
+  wealthFunding    WealthFunding?
+
+  @@index([userId])
+  @@index([cryptoBalanceId])
+  @@index([status])
+  @@index([asset])
+  @@index([network])
+  @@index([transactionHash])
+  @@index([createdAt])
+}
+
+model CryptoWithdrawal {
+  id                 String                 @id @default(cuid())
+  userId             String
+  cryptoBalanceId    String
+  asset              CryptoAsset
+  network            CryptoNetwork
+  amount             Decimal                @db.Decimal(30, 18)
+  fee                Decimal                @default(0) @db.Decimal(30, 18)
+  totalAmount        Decimal                @db.Decimal(30, 18)
+  usdAmount          Decimal?               @db.Decimal(20, 2)
+  exchangeRate       Decimal?               @db.Decimal(20, 8)
+  destinationAddress String
+  transactionHash    String?
+  blockNumber        String?
+  confirmations      Int?
+  status             CryptoWithdrawalStatus @default(PENDING)
+  description        String?
+  rejectionReason    String?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  ledgerEntry        CryptoLedgerEntry?
+  cryptoBalance      CryptoBalance          @relation(fields: [cryptoBalanceId], references: [id])
+  user               User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([cryptoBalanceId])
+  @@index([asset])
+  @@index([network])
+  @@index([status])
+  @@index([transactionHash])
+  @@index([createdAt])
+}
+
+model CryptoLedgerEntry {
+  id              String            @id @default(cuid())
+  cryptoBalanceId String
+  depositId       String?           @unique
+  asset           CryptoAsset
+  network         CryptoNetwork
+  direction       LedgerDirection
+  amount          Decimal           @db.Decimal(30, 18)
+  balanceBefore   Decimal           @db.Decimal(30, 18)
+  balanceAfter    Decimal           @db.Decimal(30, 18)
+  description     String?
+  createdAt       DateTime          @default(now())
+  withdrawalId    String?           @unique
+  cryptoBalance   CryptoBalance     @relation(fields: [cryptoBalanceId], references: [id], onDelete: Cascade)
+  deposit         CryptoDeposit?     @relation(fields: [depositId], references: [id], onDelete: Restrict)
+  withdrawal      CryptoWithdrawal?  @relation(fields: [withdrawalId], references: [id], onDelete: Restrict)
+
+  @@index([cryptoBalanceId])
+  @@index([asset])
+  @@index([network])
+  @@index([direction])
+  @@index([createdAt])
+}
+
+model GiftCardBrand {
+  id          String            @id @default(cuid())
+  name        String
+  slug        String            @unique
+  description String?
+  logoUrl     String?
+  active      Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  products    GiftCardProduct[]
+
+  @@index([active])
+  @@index([name])
+}
+
+model GiftCardProduct {
+  id                    String                   @id @default(cuid())
+  brandId               String
+  name                  String
+  slug                  String                   @unique
+  countryCode           String?
+  region                String?
+  currency              String
+  requiresCountry       Boolean                  @default(false)
+  inputMode             GiftCardInputMode        @default(BOTH)
+  redemptionMethod      GiftCardRedemptionMethod @default(FIXED_FEE)
+  redemptionValue       Decimal                  @default(0) @db.Decimal(20, 8)
+  minValue              Decimal?                 @db.Decimal(20, 2)
+  maxValue              Decimal?                 @db.Decimal(20, 2)
+  allowMultipleCards    Boolean                  @default(true)
+  maxCardsPerSubmission Int                      @default(10)
+  active                Boolean                  @default(true)
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  denominations         GiftCardDenomination[]
+  brand                 GiftCardBrand            @relation(fields: [brandId], references: [id])
+  submissions            GiftCardSubmission[]
+
+  @@index([brandId])
+  @@index([countryCode])
+  @@index([currency])
+  @@index([region])
+  @@index([active])
+}
+
+model GiftCardDenomination {
+  id           String          @id @default(cuid())
+  productId    String
+  value        Decimal         @db.Decimal(20, 2)
+  /// *
+  ///    * Optional exact credit override.
+  ///    * If present, this takes priority over the product redemption rule.
+  ///    * Example:
+  ///    * Face value = 50
+  ///    * Credit override = 48
+  creditAmount Decimal?        @db.Decimal(20, 2)
+  active       Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  product      GiftCardProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, value])
+  @@index([productId])
+  @@index([active])
+}
+
+model GiftCardSubmission {
+  id                String                   @id @default(cuid())
+  userId            String
+  productId         String
+  /// *
+  ///    * Snapshot fields.
+  ///    * These preserve exactly what the user submitted even if
+  ///    * the admin later changes the catalog configuration.
+  countryCode       String?
+  region            String?
+  currency          String
+  quantity          Int
+  faceValuePerCard  Decimal                  @db.Decimal(20, 2)
+  totalFaceValue    Decimal                  @db.Decimal(20, 2)
+  totalCreditAmount Decimal                  @db.Decimal(20, 2)
+  status            GiftCardSubmissionStatus @default(PENDING)
+  description       String?
+  adminNotes        String?
+  rejectionReason   String?
+  reviewedById      String?
+  reviewedAt        DateTime?
+  transactionId     String?                  @unique
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  product           GiftCardProduct          @relation(fields: [productId], references: [id])
+  reviewedBy        User?                    @relation("GiftCardReviewer", fields: [reviewedById], references: [id])
+  transaction       Transaction?             @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  user              User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cards             GiftCardSubmissionCard[]
+
+  @@index([userId])
+  @@index([productId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([reviewedById])
+}
+
+model GiftCardSubmissionCard {
+  id               String             @id @default(cuid())
+  submissionId     String
+  sequence         Int
+  /// *
+  ///    * Snapshot of the individual card value.
+  faceValue        Decimal            @db.Decimal(20, 2)
+  creditAmount     Decimal            @db.Decimal(20, 2)
+  /// *
+  ///    * Gift-card code is sensitive.
+  ///    * The application should encrypt giftCardCode before storing it.
+  ///    * giftCardCodeHash is used for duplicate detection.
+  giftCardCode     String?
+  giftCardCodeHash String?            @unique
+  /// *
+  ///    * Store only a private Supabase Storage path/reference here.
+  ///    * Never store public image URLs.
+  photoPath        String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  submission       GiftCardSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, sequence])
+  @@index([submissionId])
+  @@index([giftCardCodeHash])
+}
+
+model UserVerification {
+  id                 String                 @id @default(cuid())
+  userId             String                 @unique
+  tier               VerificationTier       @default(TIER_1)
+  status             VerificationStatus     @default(NOT_STARTED)
+  dateOfBirth        DateTime?
+  countryCode        String?
+  addressLine1       String?
+  addressLine2       String?
+  city               String?
+  stateProvince      String?
+  postalCode         String?
+  submittedAt        DateTime?
+  reviewedAt         DateTime?
+  reviewedById       String?
+  rejectionReason    String?
+  informationRequest String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  reviewedBy         User?                  @relation("VerificationReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+  user               User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checks             VerificationCheck[]
+  documents          VerificationDocument[]
+
+  @@index([status])
+  @@index([tier])
+  @@index([reviewedById])
+  @@index([createdAt])
+}
+
+model VerificationDocument {
+  id              String                     @id @default(cuid())
+  verificationId  String
+  type            VerificationDocumentType
+  documentNumber  String?
+  countryCode     String?
+  /// *
+  ///    * Private Supabase Storage path.
+  ///    * Never store a public URL here.
+  storagePath     String
+  status          VerificationDocumentStatus @default(PENDING)
+  rejectionReason String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  verification    UserVerification           @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  @@index([verificationId])
+  @@index([type])
+  @@index([status])
+}
+
+model VerificationCheck {
+  id             String                  @id @default(cuid())
+  verificationId String
+  type           VerificationCheckType
+  status         VerificationCheckStatus
+  /// *
+  ///    * Human-readable result from the check.
+  ///    * Flexible machine-check data.
+  ///    * This allows us to add OCR, face matching,
+  ///    * liveness, document analysis, etc. later
+  ///    * without redesigning the database.
+  result         String?
+  metadata       Json?
+  checkedAt      DateTime                @default(now())
+  verification   UserVerification        @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  @@index([verificationId])
+  @@index([type])
+  @@index([status])
+  @@index([checkedAt])
+}
+
+model SupportConversation {
+  id              String                    @id @default(cuid())
+  userId          String
+  assignedAdminId String?
+  reference       String                    @unique
+  subject         String
+  category        SupportCategory
+  status          SupportConversationStatus @default(OPEN)
+  priority        SupportPriority           @default(NORMAL)
+  lastMessageAt   DateTime?
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  assignedAdmin   User?                     @relation("SupportAssignee", fields: [assignedAdminId], references: [id])
+  user            User                      @relation("SupportCustomer", fields: [userId], references: [id], onDelete: Cascade)
+  messages        SupportMessage[]
+
+  @@index([userId])
+  @@index([assignedAdminId])
+  @@index([status])
+  @@index([category])
+  @@index([priority])
+  @@index([lastMessageAt])
+  @@index([createdAt])
+}
+
+model SupportMessage {
+  id             String                     @id @default(cuid())
+  conversationId String
+  authorId       String
+  senderType     SupportSenderType
+  body           String
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  author         User                       @relation("SupportMessageAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  conversation   SupportConversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  attachments    SupportMessageAttachment[]
+
+  @@index([conversationId])
+  @@index([authorId])
+  @@index([senderType])
+  @@index([createdAt])
+}
+
+model SupportMessageAttachment {
+  id          String         @id @default(cuid())
+  messageId   String
+  storagePath String
+  fileName    String
+  mimeType    String
+  fileSize    Int
+  createdAt   DateTime       @default(now())
+  message     SupportMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+}
+
+model WealthPlan {
+  id                  String              @id @default(cuid())
+  name                String
+  slug                String              @unique
+  description         String?
+  durationDays        Int
+  returnPercentage    Decimal             @db.Decimal(10, 4)
+  minimumUsd          Decimal             @db.Decimal(20, 2)
+  maximumUsd          Decimal?            @db.Decimal(20, 2)
+  active              Boolean             @default(true)
+  displayOrder        Int                 @default(0)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  investments         WealthInvestment[]
+  fundings            WealthFunding[]
+  wealthPlanCountries WealthPlanCountry[]
+
+  @@index([active])
+  @@index([displayOrder])
+}
+
+model WealthPlanCountry {
+  id                 String   @id @default(cuid())
+  planId             String
+  countryCode        String
+  currency           String
+  currencySymbol     String
+  minimumLocalAmount Decimal  @db.Decimal(20, 2)
+  maximumLocalAmount Decimal? @db.Decimal(20, 2)
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  plan WealthPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, countryCode])
+  @@index([planId])
+  @@index([countryCode])
+  @@index([active])
+}
+
+model WealthInvestment {
+  id     String @id @default(cuid())
+  userId String
+  planId String
+
+  principalUsd   Decimal @db.Decimal(20, 2)
+  principalLocal Decimal @db.Decimal(20, 2)
+  localCurrency  String
+  exchangeRate   Decimal @db.Decimal(20, 8)
+
+  returnPercentage   Decimal @db.Decimal(10, 4)
+  dailyProfitUsd     Decimal @db.Decimal(20, 2)
+  projectedProfitUsd Decimal @db.Decimal(20, 2)
+  maturityAmountUsd  Decimal @db.Decimal(20, 2)
+
+  startDate    DateTime
+  maturityDate DateTime
+
+  accumulatedProfitUsd Decimal @default(0) @db.Decimal(20, 2)
+  daysCompleted        Int     @default(0)
+
+  status WealthInvestmentStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan     WealthPlan      @relation(fields: [planId], references: [id])
+  earnings WealthEarning[]
+  funding  WealthFunding?
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@index([startDate])
+  @@index([maturityDate])
+  @@index([userId, status])
+}
+
+model WealthFunding {
+  id                  String              @id @default(cuid())
+  userId              String
+  planId              String
+
+  paymentMethod       WealthPaymentMethod
+  status              WealthFundingStatus @default(PENDING)
+
+  principalLocal      Decimal             @db.Decimal(20, 2)
+  principalUsd        Decimal             @db.Decimal(20, 2)
+  localCurrency       String
+  exchangeRate        Decimal             @db.Decimal(20, 8)
+
+  returnPercentage    Decimal             @db.Decimal(10, 4)
+  projectedProfitUsd  Decimal             @db.Decimal(20, 2)
+  maturityAmountUsd   Decimal             @db.Decimal(20, 2)
+
+  durationDays        Int
+  payoutDate          DateTime
+
+  cryptoDepositId     String?             @unique
+  externalReference   String?
+
+  reviewedById        String?
+  reviewedAt          DateTime?
+  rejectionReason     String?
+
+  investmentId        String?             @unique
+
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                WealthPlan          @relation(fields: [planId], references: [id])
+  cryptoDeposit       CryptoDeposit?      @relation(fields: [cryptoDepositId], references: [id], onDelete: Restrict)
+  reviewedBy          User?               @relation("WealthFundingReviewer", fields: [reviewedById], references: [id])
+  investment          WealthInvestment?   @relation(fields: [investmentId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@index([paymentMethod])
+  @@index([createdAt])
+  @@index([reviewedById])
+}
+
+model WealthEarning {
+  id           String   @id @default(cuid())
+  investmentId String
+  earningDate  DateTime
+  dayNumber    Int
+
+  amountUsd    Decimal  @db.Decimal(20, 2)
+  currency     String
+  exchangeRate Decimal? @db.Decimal(20, 8)
+  localAmount  Decimal? @db.Decimal(20, 2)
+
+  createdAt DateTime @default(now())
+
+  investment WealthInvestment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+
+  @@unique([investmentId, dayNumber])
+  @@index([investmentId])
+  @@index([earningDate])
 }
 
 enum UserRole {
   USER
   ADMIN
+}
+
+enum ReferralStatus {
+  PENDING
+  QUALIFIED
+  REWARDED
+  REVOKED
 }
 
 enum TransactionType {
@@ -76,6 +779,7 @@ enum TransactionType {
   BALANCE_ADJUSTMENT
   GOLD_PURCHASE
   GOLD_SALE
+  GIFT_CARD_REDEMPTION
 }
 
 enum TransactionStatus {
@@ -85,6 +789,7 @@ enum TransactionStatus {
   REJECTED
   CANCELLED
 }
+
 enum BalanceType {
   CASH
   REFERRAL
@@ -96,28 +801,192 @@ enum AdjustmentDirection {
   DEBIT
 }
 
-model BalanceAdjustment {
-  id String @id @default(cuid())
+enum LedgerDirection {
+  CREDIT
+  DEBIT
+}
 
-  userId  String
-  adminId String
+enum DepositMethod {
+  CARD
+  BANK_TRANSFER
+}
 
-  balanceType BalanceType
-  direction   AdjustmentDirection
+enum WithdrawalMethod {
+  BANK_TRANSFER
+}
 
-  amount   Decimal @db.Decimal(20, 2)
-  currency String  @default("USD")
+enum CryptoAsset {
+  USDC
+  USDT
+  BTC
+  ETH
+  SOL
+  TRN
+  XLM
+}
 
-  reason    String
-  reference String @unique
+enum CryptoNetwork {
+  ETHEREUM
+  TRON
+  BITCOIN
+  SOLANA
+  STELLAR
+}
 
-  createdAt DateTime @default(now())
+enum CryptoDepositStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
 
-  user  User @relation("UserAdjustments", fields: [userId], references: [id], onDelete: Cascade)
-  admin User @relation("AdminAdjustments", fields: [adminId], references: [id], onDelete: Restrict)
+enum CryptoWithdrawalStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
 
-  @@index([userId])
-  @@index([adminId])
-  @@index([balanceType])
-  @@index([createdAt])
+enum GiftCardInputMode {
+  PHOTO
+  CODE
+  BOTH
+}
+
+enum GiftCardRedemptionMethod {
+  FIXED_FEE
+  PERCENTAGE
+}
+
+enum GiftCardSubmissionStatus {
+  PENDING
+  PROCESSING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum VerificationTier {
+  TIER_1
+  TIER_2
+  TIER_3
+}
+
+enum VerificationStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+  MORE_INFORMATION_REQUIRED
+}
+
+enum VerificationDocumentType {
+  NATIONAL_ID
+  PASSPORT
+  DRIVERS_LICENSE
+  RESIDENCE_PERMIT
+  OTHER
+  SELFIE
+}
+
+enum VerificationDocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum VerificationCheckType {
+  DOCUMENT
+  DOCUMENT_EXPIRY
+  DOCUMENT_TAMPERING
+  SELFIE
+  FACE_MATCH
+  LIVENESS
+  ADDRESS
+  DATA_CONSISTENCY
+  MANUAL_REVIEW
+}
+
+enum VerificationCheckStatus {
+  PENDING
+  PASSED
+  FAILED
+  REVIEW
+}
+
+enum AccountStatus {
+  ACTIVE
+  CLOSURE_REQUESTED
+  CLOSED
+}
+
+enum SupportCategory {
+  ACCOUNT
+  SECURITY
+  DEPOSIT
+  WITHDRAWAL
+  GOLD
+  CRYPTO
+  GIFT_CARDS
+  REFERRALS
+  TRANSACTIONS
+  VERIFICATION
+  OTHER
+}
+
+enum SupportConversationStatus {
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+enum SupportPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum SupportSenderType {
+  CUSTOMER
+  SUPPORT
+  SYSTEM
+}
+
+enum NotificationType {
+  ACCOUNT
+  SECURITY
+  DEPOSIT
+  WITHDRAWAL
+  CRYPTO_DEPOSIT
+  CRYPTO_WITHDRAWAL
+  REFERRAL
+  GIFT_CARD
+  GOLD
+  SUPPORT
+  SYSTEM
+}
+
+enum WealthInvestmentStatus {
+  ACTIVE
+  MATURED
+  CANCELLED
+  COMPLETED
+}
+
+enum WealthPaymentMethod {
+  CRYPTO
+  CARD
+}
+
+enum WealthFundingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
+  CANCELLED
 }

@@ -1,0 +1,2 @@
+ALTER TYPE "DepositMethod"
+ADD VALUE IF NOT EXISTS 'CARD';

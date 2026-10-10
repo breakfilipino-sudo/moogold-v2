@@ -1,0 +1,1 @@
+ALTER TABLE "CryptoDeposit" ALTER COLUMN "amount" DROP NOT NULL;

@@ -7,8 +7,29 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error("DATABASE_URL is not configured.");
+}
+
 const adapter = new PrismaPg({
-  connectionString: process.env.DIRECT_URL,
+  connectionString,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+
+  // Keep database connections warm instead of allowing the
+  // pg driver to close them after its 10-second default idle period.
+  idleTimeoutMillis: 300_000,
+
+  // Allow a reasonable number of reused connections for
+  // concurrent MooGold requests.
+  max: 10,
+
+  // Fail clearly if a brand-new database connection cannot
+  // be established within 10 seconds.
+  connectionTimeoutMillis: 10_000,
 });
 
 export const prisma =

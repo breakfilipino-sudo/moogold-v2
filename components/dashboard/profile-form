@@ -1,0 +1,464 @@
+"use client";
+
+import {
+  Camera,
+  Check,
+  ImagePlus,
+  Loader2,
+  Save,
+  Trash2,
+  UserRound,
+} from "lucide-react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+
+import {
+  removeProfilePhoto,
+  updateProfile,
+  uploadProfilePhoto,
+} from "./actions";
+
+type ProfileFormProps = {
+  fullName: string;
+  nickname: string;
+  phone: string;
+  email: string;
+  country: string;
+  accountType: string;
+  referralCode: string;
+  accountStatus: string;
+  profilePhotoUrl: string | null;
+};
+
+type ActionState = {
+  success?: boolean;
+  message?: string;
+  error?: string;
+};
+
+const initialState: ActionState = {};
+
+function getInitials(name: string) {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return "MG";
+  }
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+export default function ProfileForm({
+  fullName,
+  nickname,
+  phone,
+  email,
+  country,
+  accountType,
+  referralCode,
+  accountStatus,
+  profilePhotoUrl,
+}: ProfileFormProps) {
+  const router = useRouter();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [profileState, profileAction, profilePending] =
+    useActionState(updateProfile, initialState);
+
+  const [photoState, photoAction, photoPending] =
+    useActionState(uploadProfilePhoto, initialState);
+
+  const [removeState, removeAction, removePending] =
+    useActionState(removeProfilePhoto, initialState);
+
+  const [previewUrl, setPreviewUrl] = useState<string | null>(
+    profilePhotoUrl,
+  );
+
+  const [selectedFileName, setSelectedFileName] = useState("");
+
+  const initials = getInitials(fullName);
+
+  useEffect(() => {
+    if (
+      profileState.success ||
+      photoState.success ||
+      removeState.success
+    ) {
+      router.refresh();
+    }
+  }, [
+    profileState.success,
+    photoState.success,
+    removeState.success,
+    router,
+  ]);
+
+  function handleFileChange(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setSelectedFileName("");
+      setPreviewUrl(profilePhotoUrl);
+
+      window.alert("Please choose a JPG, PNG, or WebP image.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setSelectedFileName("");
+      setPreviewUrl(profilePhotoUrl);
+
+      window.alert("Profile photos must be 5 MB or smaller.");
+      return;
+    }
+
+    setSelectedFileName(file.name);
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+  }
+
+  const photoMessage =
+    photoState.error || removeState.error || photoState.message || removeState.message;
+
+  return (
+    <div className="space-y-6">
+      {/* Profile identity */}
+      <section className="overflow-hidden rounded-[28px] border border-[#dfe8e3] bg-white shadow-[0_16px_45px_rgba(16,32,27,0.06)]">
+        <div className="bg-[#0a1713] px-6 py-7 text-white sm:px-8">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+            <div className="relative shrink-0">
+              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-white/10 bg-white/10 text-2xl font-black shadow-xl">
+                {previewUrl ? (
+                  <div
+                    role="img"
+                    aria-label={`${fullName} profile photo`}
+                    className="h-full w-full bg-cover bg-center"
+                    style={{
+                      backgroundImage: `url("${previewUrl}")`,
+                    }}
+                  />
+                ) : (
+                  initials
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full border-4 border-[#0a1713] bg-emerald-400 text-[#06100d] shadow-lg transition hover:bg-emerald-300"
+                aria-label="Change profile photo"
+              >
+                <Camera className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="min-w-0">
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-300">
+                <Check className="h-3 w-3" />
+                Verified account
+              </div>
+
+              <h1 className="truncate text-2xl font-black tracking-tight sm:text-3xl">
+                {fullName}
+              </h1>
+
+              {nickname ? (
+                <p className="mt-1 text-sm font-medium text-white/45">
+                  @{nickname}
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-white/40">
+                  Add a nickname to personalize your account
+                </p>
+              )}
+
+              <p className="mt-3 max-w-xl text-sm leading-6 text-white/50">
+                Manage your personal information and account details.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-5 sm:px-8">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-bold text-[#10201b]">
+                Profile photo
+              </p>
+              <p className="mt-1 text-xs leading-5 text-[#6d7d76]">
+                JPG, PNG or WebP. Maximum size 5 MB.
+              </p>
+              {selectedFileName && (
+                <p className="mt-1 truncate text-xs font-medium text-[#49665b]">
+                  Selected: {selectedFileName}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                name="photo"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#d9e3de] bg-white px-4 text-xs font-bold text-[#20352d] transition hover:bg-[#f5f8f6]"
+              >
+                <ImagePlus className="h-4 w-4" />
+                Choose photo
+              </button>
+
+              {selectedFileName && (
+  <button
+    type="button"
+    onClick={() => {
+      const file = fileInputRef.current?.files?.[0];
+
+      if (!file) {
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("photo", file);
+
+      photoAction(formData);
+    }}
+    disabled={photoPending}
+    className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0a1713] px-4 text-xs font-bold text-white transition hover:bg-[#12251e] disabled:cursor-not-allowed disabled:opacity-50"
+  >
+    {photoPending ? (
+      <Loader2 className="h-4 w-4 animate-spin" />
+    ) : (
+      <Check className="h-4 w-4" />
+    )}
+    {photoPending ? "Uploading..." : "Save photo"}
+  </button>
+)}
+
+              {profilePhotoUrl && !selectedFileName && (
+                <form action={removeAction}>
+                  <button
+                    type="submit"
+                    disabled={removePending}
+                    className="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {removePending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    Remove
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+
+          {photoMessage && (
+            <div
+              className={[
+                "mt-4 rounded-xl px-4 py-3 text-xs font-semibold",
+                photoState.error || removeState.error
+                  ? "bg-red-50 text-red-700"
+                  : "bg-emerald-50 text-emerald-700",
+              ].join(" ")}
+            >
+              {photoMessage}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Personal information */}
+      <section className="rounded-[28px] border border-[#dfe8e3] bg-white p-6 shadow-[0_12px_35px_rgba(16,32,27,0.04)] sm:p-8">
+        <div className="mb-7">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#799087]">
+            Personal information
+          </p>
+          <h2 className="mt-2 text-xl font-black tracking-tight text-[#10201b]">
+            Your details
+          </h2>
+          <p className="mt-1 text-sm text-[#708078]">
+            Your registered identity information is protected.
+          </p>
+        </div>
+
+        <form action={profileAction} className="space-y-6">
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <label
+                htmlFor="fullName"
+                className="mb-2 block text-xs font-bold text-[#344941]"
+              >
+                Full name
+              </label>
+              <div className="relative">
+                <UserRound className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aaba4]" />
+                <input
+                  id="fullName"
+                  value={fullName}
+                  readOnly
+                  className="h-12 w-full rounded-xl border border-[#e1e8e4] bg-[#f7f9f8] pl-10 pr-4 text-sm font-semibold text-[#4b5e56] outline-none"
+                />
+              </div>
+              <p className="mt-2 text-[11px] text-[#899891]">
+                Your registered name cannot be changed here.
+              </p>
+            </div>
+
+            <div>
+              <label
+                htmlFor="nickname"
+                className="mb-2 block text-xs font-bold text-[#344941]"
+              >
+                Nickname
+              </label>
+              <input
+                id="nickname"
+                name="nickname"
+                defaultValue={nickname}
+                maxLength={40}
+                placeholder="How you'd like to be called"
+                className="h-12 w-full rounded-xl border border-[#dfe7e2] bg-white px-4 text-sm font-semibold text-[#10201b] outline-none transition placeholder:text-[#a5b1ac] focus:border-[#7fc6a7] focus:ring-4 focus:ring-emerald-500/10"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="phone"
+                className="mb-2 flex items-center justify-between text-xs font-bold text-[#344941]"
+              >
+                <span>Mobile number</span>
+                <span className="font-bold text-emerald-600">
+                  Verified
+                </span>
+              </label>
+              <input
+                id="phone"
+                value={phone || "Not provided"}
+                readOnly
+                className="h-12 w-full rounded-xl border border-[#e1e8e4] bg-[#f7f9f8] px-4 text-sm font-semibold text-[#4b5e56] outline-none"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="email"
+                className="mb-2 flex items-center justify-between text-xs font-bold text-[#344941]"
+              >
+                <span>Email address</span>
+                <span className="font-bold text-emerald-600">
+                  Verified
+                </span>
+              </label>
+              <input
+                id="email"
+                value={email || "Not provided"}
+                readOnly
+                className="h-12 w-full rounded-xl border border-[#e1e8e4] bg-[#f7f9f8] px-4 text-sm font-semibold text-[#4b5e56] outline-none"
+              />
+            </div>
+          </div>
+
+          {profileState.error && (
+            <div className="rounded-xl bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
+              {profileState.error}
+            </div>
+          )}
+
+          {profileState.success && (
+            <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-700">
+              <Check className="h-4 w-4" />
+              {profileState.message}
+            </div>
+          )}
+
+          <div className="flex justify-end border-t border-[#edf1ef] pt-5">
+            <button
+              type="submit"
+              disabled={profilePending}
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#0a1713] px-5 text-xs font-bold text-white transition hover:bg-[#12251e] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {profilePending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              {profilePending ? "Saving..." : "Save changes"}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {/* Account information */}
+      <section className="rounded-[28px] border border-[#dfe8e3] bg-white p-6 shadow-[0_12px_35px_rgba(16,32,27,0.04)] sm:p-8">
+        <div className="mb-7">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#799087]">
+            Account information
+          </p>
+          <h2 className="mt-2 text-xl font-black tracking-tight text-[#10201b]">
+            Account details
+          </h2>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <InfoCard label="Account type" value={accountType} />
+          <InfoCard label="Country / region" value={country} />
+          <InfoCard
+            label="Referral code"
+            value={referralCode || "Not assigned"}
+          />
+          <InfoCard label="Account status" value={accountStatus} positive />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function InfoCard({
+  label,
+  value,
+  positive = false,
+}: {
+  label: string;
+  value: string;
+  positive?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-[#e7ede9] bg-[#f8faf9] p-4">
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#8a9992]">
+        {label}
+      </p>
+      <p
+        className={[
+          "mt-2 truncate text-sm font-black",
+          positive ? "text-emerald-700" : "text-[#253a32]",
+        ].join(" ")}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
