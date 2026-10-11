@@ -273,13 +273,13 @@ export default function SupportConversationClient({
                 Conversation closed
               </p>
 
-              <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
                 If you still need help with this
                 issue, you can reopen the conversation.
               </p>
 
               {error && (
-                <p className="mt-2 text-[10px] font-medium text-red-600 dark:text-red-400">
+                <p className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">
                   {error}
                 </p>
               )}
@@ -337,7 +337,7 @@ export default function SupportConversationClient({
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[10px] font-bold text-slate-700 dark:text-slate-200">
+            <p className="truncate text-xs font-bold text-slate-700 dark:text-slate-200">
               {attachment.name}
             </p>
 
@@ -393,7 +393,7 @@ export default function SupportConversationClient({
           rows={2}
           disabled={sending}
           placeholder="Write a message..."
-          className="min-h-[44px] flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs leading-5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/10 dark:bg-slate-950/50 dark:text-white dark:placeholder:text-slate-500 dark:focus:bg-slate-950"
+          className="min-h-[44px] flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-base leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/10 dark:bg-slate-950/50 dark:text-white dark:placeholder:text-slate-500 dark:focus:bg-slate-950"
         />
 
         <button

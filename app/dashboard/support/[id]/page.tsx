@@ -280,7 +280,7 @@ export default async function SupportConversationPage({
                                 message.attachments.length >
                                   0) && (
                                 <div
-                                  className={`overflow-hidden rounded-2xl text-xs leading-5 shadow-sm ${
+                                  className={`overflow-hidden rounded-2xl text-sm leading-6 shadow-sm ${
                                     isCustomer
                                       ? "rounded-br-md bg-emerald-600 text-white"
                                       : "rounded-bl-md border border-slate-200 bg-white text-slate-700 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-300"

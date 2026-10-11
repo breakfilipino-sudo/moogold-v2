@@ -234,10 +234,6 @@ async function getValidatedFundingDetails(
     countryConfig.minimumLocalAmount,
   );
 
-  const maximumLocalAmount =
-    countryConfig.maximumLocalAmount !== null
-      ? Number(countryConfig.maximumLocalAmount)
-      : null;
 
   if (
     !Number.isFinite(minimumLocalAmount) ||
@@ -258,16 +254,6 @@ async function getValidatedFundingDetails(
     );
   }
 
-  if (
-    maximumLocalAmount !== null &&
-    roundedLocalAmount > maximumLocalAmount
-  ) {
-    throw new Error(
-      `The maximum investment is ${countryConfig.currencySymbol}${maximumLocalAmount.toLocaleString(
-        "en-US",
-      )}.`,
-    );
-  }
 
   const localToUsdRate =
     await getLocalToUsdRate(

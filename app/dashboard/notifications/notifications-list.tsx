@@ -190,7 +190,7 @@ export default function NotificationsList({
           You&apos;re all caught up
         </h3>
 
-        <p className="mx-auto mt-1.5 max-w-sm text-xs leading-5 text-black/35">
+        <p className="mx-auto mt-1.5 max-w-sm text-sm leading-6 text-black/50">
           New account, wallet and security updates will
           appear here when there is something important to
           share.
@@ -202,7 +202,7 @@ export default function NotificationsList({
   return (
     <>
       <div className="flex items-center justify-between border-b border-black/5 px-4 py-3 sm:px-5">
-        <p className="text-[10px] font-bold text-black/35">
+        <p className="text-xs font-bold text-black/50">
           {notifications.length} recent notification
           {notifications.length === 1 ? "" : "s"}
         </p>
@@ -212,7 +212,7 @@ export default function NotificationsList({
             type="button"
             onClick={() => void handleMarkAllAsRead()}
             disabled={markingAll}
-            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-black text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
           >
             <Check className="h-3 w-3" />
 
@@ -257,7 +257,7 @@ export default function NotificationsList({
               <div className="flex flex-wrap items-center gap-2">
                 <h3
                   className={[
-                    "text-xs text-[#10201b]",
+                    "text-sm leading-5 text-[#10201b]",
                     notification.readAt
                       ? "font-bold"
                       : "font-black",
@@ -280,12 +280,12 @@ export default function NotificationsList({
                 ) : null}
               </div>
 
-              <p className="mt-1 text-[11px] leading-5 text-black/45">
+              <p className="mt-1 text-sm leading-6 text-black/60">
                 {notification.message}
               </p>
 
               <div className="mt-2 flex items-center gap-2">
-                <span className="text-[9px] font-medium text-black/25">
+                <span className="text-xs font-medium text-black/50">
                   {formatDate(notification.createdAt)}
                 </span>
 
@@ -295,9 +295,9 @@ export default function NotificationsList({
                       •
                     </span>
 
-                    <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-emerald-700 opacity-80 transition group-hover:opacity-100">
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 opacity-90 transition group-hover:opacity-100">
                       View
-                      <ChevronRight className="h-2.5 w-2.5" />
+                      <ChevronRight className="h-3.5 w-3.5" />
                     </span>
                   </>
                 ) : null}

@@ -1,6 +1,7 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import {
-ArrowDownToLine,
+  ArrowDownToLine,
+
 Bitcoin,
 ChevronRight,
 Coins,
@@ -9,6 +10,8 @@ History,
 Send,
 UsersRound,
 WalletCards,
+  Gamepad2,
+  PiggyBank,
 } from "lucide-react";
 import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -222,36 +225,29 @@ return ( <div className="flex items-center justify-between gap-4 py-3"> <span cl
 }
 
 function ServiceCard({
-href,
-icon: Icon,
-label,
-description,
+  href,
+  icon: Icon,
+  label,
 }: {
-href: string;
-icon: typeof WalletCards;
-label: string;
-description: string;
+  href: string;
+  icon: typeof WalletCards;
+  label: string;
 }) {
-return ( <Link
-   href={href}
-   className="group rounded-2xl border border-black/5 bg-white p-4 transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_12px_30px_rgba(16,32,27,0.06)]"
- > <div className="flex items-start justify-between gap-4"> <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 transition group-hover:bg-emerald-100"> <Icon className="h-4.5 w-4.5" /> </div>
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      className="flex min-h-[112px] w-[124px] shrink-0 snap-start flex-col items-center justify-center rounded-2xl border border-black/5 bg-white px-2 py-3 text-center sm:min-h-[116px] sm:w-auto sm:min-w-0 sm:shrink sm:snap-none sm:px-3 sm:py-4"
+    >
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 sm:h-12 sm:w-12">
+        <Icon className="h-5 w-5" />
+      </div>
 
-    <ChevronRight className="mt-1 h-4 w-4 text-black/20 transition group-hover:translate-x-0.5 group-hover:text-emerald-600" />
-  </div>
-
-  <div className="mt-5">
-    <p className="text-sm font-bold text-[#10201b]">
-      {label}
-    </p>
-
-    <p className="mt-1 text-xs leading-5 text-black/40">
-      {description}
-    </p>
-  </div>
-</Link>
-
-);
+      <p className="mt-2 w-full break-words [overflow-wrap:anywhere] text-[11px] font-bold leading-4 text-[#10201b] sm:text-xs">
+        {label}
+      </p>
+    </Link>
+  );
 }
 
 export default async function WalletPage() {
@@ -377,18 +373,27 @@ return ( <div className="space-y-8 pb-10"> <section> <p className="text-xs font-
             </p>
 
             <p className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-              {formatCurrency(cashBalance)}
+              {localCurrency === "USD"
+                ? formatCurrency(cashBalance, "USD")
+                : localBalanceDisplay
+                  ? (
+                    <>
+                      {localBalanceDisplay}
+                    </>
+                  )
+                  : "\u2014"}
             </p>
 
-            <p className="mt-2 text-xs font-medium text-white/35">
-              {t("availableFundsIn")} {localCurrency}
-            </p>
+            {localCurrency !== "USD" ? (
+              <>
+                <p className="mt-2 text-xs font-medium text-white/35">
+                  {t("availableFundsIn")} USD
+                </p>
 
-            {localCurrency !== "USD" &&
-            localBalanceDisplay ? (
-              <p className="mt-1 text-sm font-semibold text-emerald-300/80">
-                â‰ˆ {localBalanceDisplay}
-              </p>
+                <p className="mt-1 text-sm font-semibold text-emerald-300/80">
+                  {formatCurrency(cashBalance, "USD")}
+                </p>
+              </>
             ) : null}
           </div>
 
@@ -397,8 +402,8 @@ return ( <div className="space-y-8 pb-10"> <section> <p className="text-xs font-
               href="/dashboard/deposit"
               className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 text-sm font-bold text-[#10201b] transition hover:bg-emerald-300"
             >
-              <ArrowDownToLine className="h-4 w-4" />
-              {t("addFund")}
+
+              {language === "fil" ? "Mag-top up" : language === "ms" ? "Tambah nilai" : language === "zh" ? "\u5145\u503C" : "Top up"}
             </Link>
 
             <Link
@@ -423,37 +428,56 @@ return ( <div className="space-y-8 pb-10"> <section> <p className="text-xs font-
       <p className="mt-1 text-xs font-medium text-black/40">
         {t("exploreManageAssets")}
       </p>
+
     </div>
 
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="flex w-full min-w-0 snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 sm:grid sm:grid-cols-3 sm:overflow-visible sm:overscroll-auto sm:pb-0 sm:snap-none xl:grid-cols-6">
       <ServiceCard
         href="/dashboard/crypto"
         icon={Bitcoin}
         label={t("crypto")}
-        description={t("manageDigitalAssets")}
       />
 
       <ServiceCard
         href="/dashboard/gold"
         icon={Coins}
         label={t("buySellGold")}
-        description={t("tradeManageGold")}
       />
 
       <ServiceCard
         href="/dashboard/gift-cards"
         icon={Gift}
         label={t("giftCards")}
-        description={t("buyManageGiftCards")}
       />
 
       <ServiceCard
         href="/dashboard/referrals"
         icon={UsersRound}
         label={t("referrals")}
-        description={t("trackReferralRewards")}
+      />
+      <ServiceCard
+        href="/dashboard/wealth-box"
+        icon={PiggyBank}
+        label={language === "fil" ? "Kahon ng Yaman" : language === "ms" ? "Kotak Kekayaan" : language === "zh" ? "\u8D22\u5BCC\u76D2" : "Wealth Box"}
+      />
+      <ServiceCard
+        href="/dashboard/games"
+        icon={Gamepad2}
+        label={language === "fil" ? "Mga Laro" : language === "ms" ? "Permainan" : language === "zh" ? "\u6E38\u620F" : "Games"}
       />
     </div>
+
+    <p className="mt-2 flex items-center justify-center gap-2 text-xs font-semibold text-[#52655c] sm:hidden">
+      <span aria-hidden="true">&larr;</span>
+      {language === "fil"
+        ? "Mag-swipe pakaliwa o pakanan para makita lahat ng serbisyo"
+        : language === "ms"
+          ? "Leret ke kiri atau kanan untuk melihat semua perkhidmatan"
+          : language === "zh"
+            ? "\u5411\u5DE6\u6216\u53F3\u6ED1\u52A8\u67E5\u770B\u5168\u90E8\u670D\u52A1"
+            : "Swipe left or right to see all services"}
+      <span aria-hidden="true">&rarr;</span>
+    </p>
   </section>
 
   <section className="rounded-2xl border border-black/5 bg-white">
