@@ -350,8 +350,7 @@ return ( <main className="min-h-screen overflow-x-hidden bg-[#f7faf8] text-[#172
         }
       `}</style>
 
-  <div className="fixed inset-x-0 top-0 z-10 h-screen overflow-hidden">
-    <header className="absolute inset-x-0 top-0 z-50 border-b border-[#e4ebe7]/90 bg-[#f7faf8]/95 backdrop-blur-xl">
+  <header className="fixed inset-x-0 top-0 z-[100] border-b border-[#e4ebe7]/90 bg-[#f7faf8]/95 backdrop-blur-xl">
       <div className="mx-auto flex h-[68px] max-w-6xl items-center justify-between px-5 sm:px-6 lg:px-8">
         <Link
           href="/"
@@ -458,8 +457,8 @@ return ( <main className="min-h-screen overflow-x-hidden bg-[#f7faf8] text-[#172
           </nav>
         </div>
       ) : null}
-    </header>
-
+  </header>
+      <div className="relative h-screen overflow-hidden">
     <section className="h-full border-b border-[#e4ebe7] bg-white pt-[68px]">
       <div className="mx-auto grid h-full max-w-6xl items-center gap-12 overflow-y-auto px-5 py-10 sm:px-6 sm:py-12 lg:grid-cols-[1fr_450px] lg:overflow-visible lg:px-8 lg:py-16">
         <div className="max-w-[560px]">
@@ -505,7 +504,6 @@ return ( <main className="min-h-screen overflow-x-hidden bg-[#f7faf8] text-[#172
     </section>
   </div>
 
-  <div className="h-screen" />
 
   <section
     id="products"
@@ -522,6 +520,24 @@ return ( <main className="min-h-screen overflow-x-hidden bg-[#f7faf8] text-[#172
         <p className="mt-3 max-w-[520px] text-sm leading-6 text-[#7d8983]">
           {t("productsDescription")}
         </p>
+      </div>
+      <div className="mt-8 overflow-hidden rounded-[28px] border border-[#cbded3] bg-[#0d2c21] p-6 text-white sm:p-8 lg:p-10">
+        <div className="grid gap-6 sm:grid-cols-[1fr_auto] sm:items-center">
+          <div className="max-w-2xl">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8bd8b1]">
+              {t("wealthBox")}
+            </p>
+            <h3 className="mt-2 text-2xl font-semibold tracking-[-0.04em] sm:text-3xl">
+              {t("wealthBoxFeatureTitle")}
+            </h3>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-white/65">
+              {t("wealthBoxDescription")}
+            </p>
+          </div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.07]">
+            <WalletCards className="h-8 w-8 text-[#d7bd71]" />
+          </div>
+        </div>
       </div>
       <div className="mt-8 grid gap-4 md:grid-cols-2">
         <WalletService language={initialLanguage} />
