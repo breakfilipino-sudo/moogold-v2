@@ -105,7 +105,7 @@ oneAccount: "One account",
     "Receive and convert crypto, manage digital assets, and transfer funds to your personal bank account.",
   faqQuestionFour: "What is Wealth Box?",
   faqAnswerFour:
-    "Wealth Box offers a simple way to put your money to work and grow your wealth. Growth is not guaranteed.",
+    "Wealth Box offers a simple way to put your money to work and grow your wealth.",
   faqQuestionFive: "Can I redeem gift cards?",
   faqAnswerFive:
     "You can redeem supported gift cards through the Gift Cards service.",
@@ -304,7 +304,7 @@ const translations: Record<LanguageCode, TranslationOverrides> = {
       "Tumanggap at mag-convert ng crypto, pamahalaan ang digital asset, at maglipat ng pondo sa iyong personal na bank account.",
     faqQuestionFour: "Ano ang Wealth Box?",
     faqAnswerFour:
-      "Nag-aalok ang Wealth Box ng simpleng paraan para mapalago ang iyong pera. Hindi garantisado ang paglago.",
+      "Nag-aalok ang Wealth Box ng simpleng paraan para mapalago ang iyong pera.",
     faqQuestionFive: "Maaari ba akong mag-redeem ng gift card?",
     faqAnswerFive:
       "Maaari kang mag-redeem ng mga suportadong gift card sa pamamagitan ng serbisyo ng Gift Cards.",
@@ -490,7 +490,7 @@ const translations: Record<LanguageCode, TranslationOverrides> = {
       "Terima dan tukar kripto, urus aset digital, serta pindahkan dana ke akaun bank peribadi anda.",
     faqQuestionFour: "Apakah itu Wealth Box?",
     faqAnswerFour:
-      "Wealth Box menawarkan cara mudah untuk mengembangkan wang anda. Pertumbuhan tidak dijamin.",
+      "Wealth Box menawarkan cara mudah untuk mengembangkan wang anda.",
     faqQuestionFive: "Bolehkah saya menebus kad hadiah?",
     faqAnswerFive:
       "Anda boleh menebus kad hadiah yang disokong melalui perkhidmatan Kad Hadiah.",
@@ -665,7 +665,7 @@ const translations: Record<LanguageCode, TranslationOverrides> = {
     faqQuestionThree: "我可以使用加密货币进行哪些操作？",
     faqAnswerThree: "您可以接收和兑换加密货币、管理数字资产，并将资金转入个人银行账户。",
     faqQuestionFour: "什么是财富箱？",
-    faqAnswerFour: "财富箱提供了一种让您的资金发挥作用、帮助财富增长的简单方式。增长并无保证。",
+    faqAnswerFour: "财富箱提供了一种让您的资金发挥作用、帮助财富增长的简单方式。",
     faqQuestionFive: "我可以兑换礼品卡吗？",
     faqAnswerFive: "您可以通过礼品卡服务兑换受支持的礼品卡。",
     faqQuestionSix: "如何保护我的账户？",
