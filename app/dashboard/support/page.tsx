@@ -196,7 +196,7 @@ export default async function SupportPage() {
             How can we help?
           </h2>
 
-          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
             Chat directly with MooGold Customer Service about your
             account, payments, transactions, or anything else you
             need help with.
@@ -218,7 +218,7 @@ export default async function SupportPage() {
                 Start a conversation
               </p>
 
-              <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                 Send a message to Customer Service
               </p>
             </div>
@@ -237,7 +237,7 @@ export default async function SupportPage() {
                   : "Previous conversations"}
               </h2>
 
-              <span className="text-[10px] text-slate-400 dark:text-slate-500">
+              <span className="text-xs text-slate-400 dark:text-slate-500">
                 {conversations.length}
               </span>
             </div>
@@ -278,7 +278,7 @@ export default async function SupportPage() {
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="truncate text-xs font-bold text-slate-900 dark:text-white">
+                          <p className="truncate text-sm font-bold text-slate-900 dark:text-white">
                             {conversation.subject}
                           </p>
 
@@ -293,14 +293,14 @@ export default async function SupportPage() {
                           </span>
                         </div>
 
-                        <p className="mt-0.5 truncate text-[11px] text-slate-500 dark:text-slate-400">
+                        <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
                           {latestMessage?.body ??
                             "No messages yet"}
                         </p>
                       </div>
 
                       <div className="flex shrink-0 items-center gap-2">
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                        <span className="text-xs text-slate-400 dark:text-slate-500">
                           {formatDate(
                             latestMessage?.createdAt ??
                               conversation.lastMessageAt ??

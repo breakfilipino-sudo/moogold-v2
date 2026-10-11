@@ -135,9 +135,7 @@ export default function WealthBoxForm({
     numericAmount > 0 &&
     numericAmount < minimum;
 
-  const amountAboveMaximum =
-    maximum !== null &&
-    numericAmount > maximum;
+  const amountAboveMaximum = false;
 
   const amountValid =
     numericAmount > 0 &&
@@ -182,10 +180,7 @@ export default function WealthBoxForm({
     <div className="space-y-5">
       <section className="rounded-[24px] border border-[#d7e3dd] bg-white p-5 shadow-[0_8px_30px_rgba(16,32,27,0.04)] sm:p-6">
         <div>
-          <h3 className="text-lg font-extrabold tracking-tight text-[#10201b]">
-            Enter the amount you want to
-            invest.
-          </h3>
+          <h3 className="whitespace-nowrap text-[15px] font-extrabold tracking-tight text-[#10201b] sm:text-lg">Enter the amount you want to invest.</h3>
         </div>
 
         <div className="mt-5 rounded-2xl border border-[#cbdad3] bg-[#f7faf8] px-4 py-4 transition focus-within:border-emerald-400 focus-within:bg-white">
@@ -245,9 +240,7 @@ export default function WealthBoxForm({
 
       <section>
         <div className="mb-4">
-          <h2 className="mt-1 text-xl font-extrabold tracking-tight text-[#10201b]">
-            Choose your investment plan
-          </h2>
+          <h2 className="mt-1 whitespace-nowrap text-[15px] font-extrabold tracking-tight text-[#10201b] sm:text-lg">Choose your investment plan</h2>
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -258,14 +251,7 @@ export default function WealthBoxForm({
             const planProfit =
               getPlanProfit(plan);
 
-            const planAmountValid =
-              numericAmount > 0 &&
-              numericAmount >=
-                plan.minimumLocalAmount &&
-              (plan.maximumLocalAmount ===
-                null ||
-                numericAmount <=
-                  plan.maximumLocalAmount);
+            const planAmountValid = numericAmount > 0 && numericAmount >= plan.minimumLocalAmount;
 
             return (
               <button
@@ -276,7 +262,7 @@ export default function WealthBoxForm({
                     plan.id,
                   )
                 }
-                className={`rounded-[20px] border p-4 text-left transition ${
+                className={`min-w-0 overflow-hidden rounded-[20px] border p-3 text-left transition sm:p-4 ${
                   selected
                     ? "border-emerald-600 bg-emerald-50 shadow-[0_8px_24px_rgba(5,150,105,0.08)]"
                     : "border-[#d7e3dd] bg-white hover:border-emerald-300 hover:bg-emerald-50/40"
@@ -307,7 +293,7 @@ export default function WealthBoxForm({
                     Amount you will earn
                   </p>
 
-                  <p className="mt-1 text-2xl font-extrabold tracking-tight text-emerald-700">
+                  <p className="mt-1 min-w-0 break-words [overflow-wrap:anywhere] text-base font-extrabold leading-tight tracking-tight tabular-nums text-emerald-700 sm:text-2xl">
                     {planAmountValid
                       ? formatLocal(
                           planProfit,

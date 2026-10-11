@@ -220,7 +220,7 @@ export default function NewSupportForm() {
             </button>
           </div>
 
-          <p className="mb-2 mt-1.5 text-[10px] text-slate-400 dark:text-slate-500">
+          <p className="mb-2 mt-1.5 text-xs text-slate-400 dark:text-slate-500">
             {attachment.name}
           </p>
         </div>
@@ -262,7 +262,7 @@ export default function NewSupportForm() {
             rows={1}
             disabled={submitting}
             placeholder="Write a message..."
-            className="max-h-32 min-h-9 w-full resize-none border-0 bg-transparent px-1 py-2 text-xs leading-5 text-slate-900 outline-none placeholder:text-slate-400 disabled:opacity-60 dark:text-white dark:placeholder:text-slate-500"
+            className="max-h-32 min-h-9 w-full resize-none border-0 bg-transparent px-1 py-2 text-base leading-6 text-slate-900 outline-none placeholder:text-slate-400 disabled:opacity-60 dark:text-white dark:placeholder:text-slate-500"
             onKeyDown={(event) => {
               if (
                 event.key === "Enter" &&
@@ -305,7 +305,7 @@ export default function NewSupportForm() {
 
       {/* Error */}
       {error && (
-        <div className="border-t border-red-100 bg-red-50 px-3 py-2 text-[10px] font-medium text-red-600 dark:border-red-500/10 dark:bg-red-500/5 dark:text-red-400">
+        <div className="border-t border-red-100 bg-red-50 px-3 py-2 text-xs font-medium text-red-600 dark:border-red-500/10 dark:bg-red-500/5 dark:text-red-400">
           {error}
         </div>
       )}

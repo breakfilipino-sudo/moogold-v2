@@ -74,8 +74,8 @@ export default async function NewSupportPage() {
         </div>
 
         {/* Chat area */}
-        <div className="flex flex-1 flex-col">
-          <div className="flex-1 py-5">
+        <div className="flex flex-col sm:flex-1">
+          <div className="py-3 sm:flex-1 sm:py-5">
             <div className="mx-auto max-w-xl text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-emerald-400 dark:ring-white/10">
                 <MessageCircle className="h-5 w-5" />

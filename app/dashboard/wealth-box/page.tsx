@@ -1,6 +1,5 @@
 import {
   BriefcaseBusiness,
-  ShieldCheck,
 } from "lucide-react";
 
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -112,6 +111,7 @@ export default async function WealthBoxPage() {
           plan: {
             select: {
               name: true,
+              durationDays: true,
             },
           },
           earnings: {
@@ -206,8 +206,17 @@ export default async function WealthBoxPage() {
         b.date.getTime() - a.date.getTime(),
     );
 
-  const activeInvestment =
-    investments[0] ?? null;
+  const activeInvestment = investments[0] ?? null;
+
+  const activeInvestmentProfitLocal =
+    activeInvestment && Number(activeInvestment.principalUsd) > 0
+      ? Number(activeInvestment.accumulatedProfitUsd) *
+        (Number(activeInvestment.principalLocal) /
+          Number(activeInvestment.principalUsd))
+      : 0;
+
+  const activePlanDurationDays =
+    activeInvestment?.plan.durationDays ?? 0;
 
   const planData = plans.map((plan) => {
     const countryConfig =
@@ -270,33 +279,40 @@ export default async function WealthBoxPage() {
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#10201b] sm:text-[26px]">
               Wealth Box
             </h1>
+            <p className="mt-1 whitespace-nowrap text-[11px] font-semibold leading-5 text-[#52655c] sm:text-sm">Grow your money. Earn more.</p>
           </div>
         </div>
 
-        <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#52655c]">
-          Grow your money and watch your earnings
-          build over time.
-        </p>
+
       </section>
 
       <section className="overflow-hidden rounded-[26px] border border-[#d7e3dd] bg-white shadow-[0_12px_40px_rgba(16,32,27,0.05)]">
         <div className="bg-[#10201b] px-5 py-6 text-white sm:px-7 sm:py-7">
-          <div className="flex items-start justify-between gap-5">
-            <div>
+          <div className="flex items-center justify-between gap-3 sm:gap-5">
+            <div className="min-w-0 flex-1 text-left">
               <p className="text-sm font-extrabold">
                 Your active Investments
               </p>
 
-              <p className="mt-2 text-4xl font-extrabold tracking-tight sm:text-[42px]">
+              <p className="mt-2 min-w-0 text-[clamp(1.5rem,7vw,2.25rem)] font-extrabold leading-tight tracking-tight sm:text-[42px]">
                 {formatLocalAmount(
                   currentBalance,
                   localCurrency,
                 )}
               </p>
+
+              {activeInvestment && activePlanDurationDays > 0 ? (
+                <p className="mt-1 min-w-0 break-words [overflow-wrap:anywhere] text-[11px] font-semibold leading-4 text-emerald-200 sm:text-xs">
+                  Earned +{formatLocalAmount(
+                    activeInvestmentProfitLocal,
+                    localCurrency,
+                  )} for {activePlanDurationDays}-day plan
+                </p>
+              ) : null}
             </div>
 
             <div className="flex shrink-0 flex-col items-end gap-3">
-              <ShieldCheck className="h-5 w-5 text-emerald-300" />
+
 
               {activeInvestment ? (
                 <CashOutButton
@@ -314,7 +330,7 @@ export default async function WealthBoxPage() {
 
         {investments.length > 0 &&
         dailyEarnings.length > 0 ? (
-          <div className="divide-y divide-[#e7eeea]">
+          <div className="hidden divide-y divide-[#e7eeea]">
             {dailyEarnings.map((earning) => (
               <div
                 key={earning.id}
