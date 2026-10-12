@@ -21,25 +21,20 @@ type Service = {
   icon: LucideIcon;
 };
 
-const copy: Record<
-  LanguageCode,
-  {
-    welcome: string;
-    tagline: string;
-    login: string;
-    createAccount: string;
-    discover: string;
-    discoverSubtitle: string;
-    services: Service[];
-  }
-> = {
+type WelcomeCopy = {
+  welcome: string;
+  tagline: string;
+  login: string;
+  createAccount: string;
+  services: Service[];
+};
+
+const copy: Record<LanguageCode, WelcomeCopy> = {
   en: {
     welcome: "Welcome to MooGold",
     tagline: "Grow your money. Own your future.",
     login: "Log in",
     createAccount: "Create account",
-    discover: "Discover what you can do",
-    discoverSubtitle: "A few ways MooGold can help you.",
     services: [
       {
         title: "Personal Wallet",
@@ -83,13 +78,12 @@ const copy: Record<
       },
     ],
   },
+
   fil: {
     welcome: "Maligayang pagdating sa MooGold",
     tagline: "Palaguin ang iyong pera. Ihanda ang iyong kinabukasan.",
     login: "Mag-log in",
     createAccount: "Gumawa ng account",
-    discover: "Tuklasin ang maaari mong gawin",
-    discoverSubtitle: "Ilan sa mga serbisyong makakatulong sa iyo.",
     services: [
       {
         title: "Personal Wallet",
@@ -133,13 +127,12 @@ const copy: Record<
       },
     ],
   },
+
   ms: {
     welcome: "Selamat datang ke MooGold",
     tagline: "Kembangkan wang anda. Bina masa depan anda.",
     login: "Log masuk",
     createAccount: "Cipta akaun",
-    discover: "Terokai perkara yang boleh anda lakukan",
-    discoverSubtitle: "Antara cara MooGold boleh membantu anda.",
     services: [
       {
         title: "Dompet Peribadi",
@@ -183,13 +176,12 @@ const copy: Record<
       },
     ],
   },
+
   zh: {
     welcome: "欢迎来到 MooGold",
-    tagline: "让财富成长，掌握自己的未来。",
+    tagline: "让财富增长，创造美好未来。",
     login: "登录",
     createAccount: "创建账户",
-    discover: "了解您可以使用的服务",
-    discoverSubtitle: "看看 MooGold 如何帮助您。",
     services: [
       {
         title: "个人钱包",
@@ -218,12 +210,12 @@ const copy: Record<
       },
       {
         title: "推荐奖励",
-        description: "邀请朋友并获取奖励。",
+        description: "邀请朋友并获得奖励。",
         icon: Users,
       },
       {
         title: "财经新闻",
-        description: "关注最新财经新闻。",
+        description: "了解最新财经资讯。",
         icon: Newspaper,
       },
       {
@@ -253,7 +245,7 @@ export default function InstalledWelcomeScreen({
 
     const interval = window.setInterval(() => {
       setActiveIndex((current) => (current + 1) % content.services.length);
-    }, 4200);
+    }, 2500);
 
     return () => window.clearInterval(interval);
   }, [content.services.length]);
@@ -262,38 +254,23 @@ export default function InstalledWelcomeScreen({
   const ServiceIcon = service.icon;
 
   return (
-    <main className="relative flex min-h-[100svh] flex-col overflow-hidden bg-[#071b13] px-5 py-6 text-white">
+    <main className="relative flex min-h-[100svh] flex-col justify-center overflow-hidden bg-[#071b13] px-5 py-8 text-white sm:px-6">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -right-24 -top-28 h-72 w-72 rounded-full bg-[#138a5d]/20 blur-3xl"
+        className="pointer-events-none absolute -right-24 -top-28 h-72 w-72 rounded-full bg-[#138a5d]/15 blur-3xl"
       />
+
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-[#cba75b]/10 blur-3xl"
       />
 
-      <header className="relative mx-auto flex w-full max-w-md items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-[#138a5d] shadow-lg shadow-black/15">
-          <span className="text-xl font-black tracking-tight text-white">M</span>
-        </div>
+      <section className="relative mx-auto flex w-full max-w-md flex-col">
         <div>
-          <p className="text-lg font-bold tracking-[-0.04em]">MooGold</p>
-          <p className="text-[10px] font-medium tracking-[0.16em] text-white/50">
-            MORE THAN A WALLET
-          </p>
-        </div>
-      </header>
-
-      <section className="relative mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-8">
-        <div className="mb-8">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#d5b56e]/25 bg-[#d5b56e]/10 px-3 py-1.5 text-[10px] font-semibold tracking-wide text-[#e6ca8c]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#d5b56e]" />
-            MONEY · GOLD · CRYPTO · REWARDS
-          </div>
-
-          <h1 className="max-w-sm text-3xl font-bold leading-[1.12] tracking-[-0.05em] sm:text-4xl">
+          <h1 className="max-w-sm text-3xl font-bold leading-[1.15] tracking-[-0.05em] sm:text-4xl">
             {content.welcome}
           </h1>
+
           <p className="mt-3 text-sm leading-6 text-white/65">
             {content.tagline}
           </p>
@@ -305,6 +282,7 @@ export default function InstalledWelcomeScreen({
             >
               {content.login}
             </Link>
+
             <Link
               href="/register"
               className="flex h-12 items-center justify-center rounded-xl bg-[#d5b56e] px-4 text-sm font-bold text-[#14251c] transition hover:bg-[#e3c783]"
@@ -314,39 +292,31 @@ export default function InstalledWelcomeScreen({
           </div>
         </div>
 
-        <section aria-label={content.discover}>
-          <h2 className="text-base font-semibold tracking-[-0.02em]">
-            {content.discover}
-          </h2>
-          <p className="mt-1 text-xs leading-5 text-white/50">
-            {content.discoverSubtitle}
-          </p>
-
+        <section className="mt-12" aria-label="MooGold services">
           <div
-            className="relative mt-4 min-h-[168px] overflow-hidden rounded-2xl border border-white/10 bg-white/[0.055] p-5"
+            className="relative min-h-[160px] overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-5 sm:p-6"
             aria-live="polite"
             aria-atomic="true"
           >
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#d5b56e]/20 bg-[#d5b56e]/10 text-[#e6ca8c]">
                 <ServiceIcon className="h-6 w-6" strokeWidth={1.8} />
               </div>
-              <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-medium tabular-nums text-white/45">
-                {String(activeIndex + 1).padStart(2, "0")} /{" "}
-                {String(content.services.length).padStart(2, "0")}
-              </span>
-            </div>
 
-            <h3 className="mt-5 text-lg font-semibold tracking-[-0.03em]">
-              {service.title}
-            </h3>
-            <p className="mt-1 text-sm leading-5 text-white/55">
-              {service.description}
-            </p>
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold tracking-[-0.03em]">
+                  {service.title}
+                </h2>
+
+                <p className="mt-1 text-sm leading-5 text-white/55">
+                  {service.description}
+                </p>
+              </div>
+            </div>
           </div>
 
           <div
-            className="mt-4 flex items-center justify-center gap-2"
+            className="mt-5 flex items-center justify-center gap-2"
             aria-label="Choose a service slide"
           >
             {content.services.map((item, index) => (
@@ -366,10 +336,6 @@ export default function InstalledWelcomeScreen({
           </div>
         </section>
       </section>
-
-      <footer className="relative mx-auto w-full max-w-md pb-1 text-center text-[10px] text-white/35">
-        Money · Gold · Crypto · Gift Cards · Rewards
-      </footer>
     </main>
   );
 }
