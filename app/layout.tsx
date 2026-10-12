@@ -1,8 +1,9 @@
-import type { Metadata, Viewport } from "next";
+﻿import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
+import PwaRegister from "./pwa-register";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MooGold — Wealth Dashboard",
+  title: "MooGold â€” Wealth Dashboard",
   description:
     "Your financial world for money, gold, crypto, gift cards and rewards.",
   manifest: "/manifest.webmanifest",
@@ -50,6 +51,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
+        <PwaRegister />
         {children}
       </body>
     </html>
