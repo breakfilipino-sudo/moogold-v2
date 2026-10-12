@@ -2,22 +2,31 @@
 import { redirect } from "next/navigation";
 
 import MooGoldLanding from "@/components/home/moogold-landing";
+import InstalledWelcomeScreen from "@/components/home/installed-welcome-screen";
 import type { LanguageCode } from "@/lib/i18n/languages";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 
 const supportedLanguages: LanguageCode[] = ["en", "fil", "ms", "zh"];
 
-export default async function HomePage() {
-  const cookieStore = await cookies();
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ source?: string }>;
+}) {
+  const [cookieStore, query] = await Promise.all([
+    cookies(),
+    searchParams,
+  ]);
+
   const savedLanguage = cookieStore.get("moogold-language")?.value;
   const hasAccount = cookieStore.get("moogold-has-account")?.value === "1";
+  const isPwaLaunch = query.source === "pwa";
 
   const initialLanguage: LanguageCode =
     supportedLanguages.find((language) => language === savedLanguage) ?? "en";
 
-  // Only a real, verified Supabase session plus an existing MooGold profile
-  // can route a visitor directly into the dashboard.
+  // A verified session and an existing MooGold profile always take priority.
   try {
     const supabase = await createClient();
     const {
@@ -36,7 +45,7 @@ export default async function HomePage() {
       }
     }
   } catch (error) {
-    // Next.js redirect() throws internally; allow that redirect to continue.
+    // Next.js redirects throw internally; allow them to continue.
     if (
       error &&
       typeof error === "object" &&
@@ -50,7 +59,12 @@ export default async function HomePage() {
     console.error("Home session check failed:", error);
   }
 
-  // This cookie remembers a previous account visit; it never grants access.
+  // Installed-app launches get the welcome screen, even on returning devices.
+  if (isPwaLaunch) {
+    return <InstalledWelcomeScreen initialLanguage={initialLanguage} />;
+  }
+
+  // Preserve existing browser behavior for returning account holders.
   if (hasAccount) {
     redirect("/login");
   }

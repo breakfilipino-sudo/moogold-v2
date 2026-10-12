@@ -10,6 +10,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -28,6 +29,8 @@ export default function InstallAppButton({
   className?: string;
   children?: React.ReactNode;
 }) {
+  const router = useRouter();
+
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [showGuide, setShowGuide] = useState(false);
@@ -53,6 +56,7 @@ export default function InstallAppButton({
       setInstalledThisSession(true);
       setInstallPrompt(null);
       setShowGuide(false);
+      setShowInstalledNotice(true);
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
@@ -151,13 +155,26 @@ export default function InstallAppButton({
               to continue.
             </p>
 
-            <button
-              type="button"
-              onClick={() => setShowInstalledNotice(false)}
-              className="mt-5 h-11 w-full rounded-xl bg-[#138a5d] text-sm font-bold text-white"
-            >
-              Got it
-            </button>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setShowInstalledNotice(false)}
+                className="h-11 rounded-xl border border-[#dfe7e2] bg-white text-sm font-semibold text-[#25352e]"
+              >
+                Got it
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowInstalledNotice(false);
+                  router.push("/?source=pwa");
+                }}
+                className="h-11 rounded-xl bg-[#138a5d] text-sm font-bold text-white"
+              >
+                Open MooGold
+              </button>
+            </div>
           </div>
         </div>
       )}

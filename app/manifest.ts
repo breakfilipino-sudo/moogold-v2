@@ -7,11 +7,11 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "MooGold",
     description:
       "Your financial world for money, gold, crypto, gift cards and rewards.",
-    start_url: "/",
+    start_url: "/?source=pwa",
     scope: "/",
     display: "standalone",
     display_override: ["standalone"],
-    background_color: "#f7faf8",
+    background_color: "#071b13",
     theme_color: "#138a5d",
     orientation: "portrait",
     categories: ["finance", "business"],
