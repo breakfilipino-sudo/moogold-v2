@@ -1,3 +1,4 @@
+﻿
 "use client";
 
 import {
@@ -6,14 +7,12 @@ import {
   X,
   MoreVertical,
   Smartphone,
+  CheckCircle2,
 } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<{
-    outcome: "accepted" | "dismissed";
-    platform: string;
-  }>;
+  prompt: () => Promise<void>;
   userChoice: Promise<{
     outcome: "accepted" | "dismissed";
     platform: string;
@@ -31,34 +30,32 @@ export default function InstallAppButton({
 }) {
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
-
   const [showGuide, setShowGuide] = useState(false);
+  const [showInstalledNotice, setShowInstalledNotice] = useState(false);
   const [guidePlatform, setGuidePlatform] =
     useState<GuidePlatform | null>(null);
+  const [installedThisSession, setInstalledThisSession] = useState(false);
 
-  const isInstalled = useSyncExternalStore(
-    subscribeToInstallState,
-    getInstallState,
-    getServerInstallState,
-  );
+  const isInstalled =
+    useSyncExternalStore(
+      subscribeToInstallState,
+      getInstallState,
+      getServerInstallState,
+    ) || installedThisSession;
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
-
       setInstallPrompt(event as BeforeInstallPromptEvent);
     };
 
     const handleAppInstalled = () => {
+      setInstalledThisSession(true);
       setInstallPrompt(null);
       setShowGuide(false);
     };
 
-    window.addEventListener(
-      "beforeinstallprompt",
-      handleBeforeInstallPrompt,
-    );
-
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     window.addEventListener("appinstalled", handleAppInstalled);
 
     return () => {
@@ -66,64 +63,46 @@ export default function InstallAppButton({
         "beforeinstallprompt",
         handleBeforeInstallPrompt,
       );
-
-      window.removeEventListener(
-        "appinstalled",
-        handleAppInstalled,
-      );
+      window.removeEventListener("appinstalled", handleAppInstalled);
     };
   }, []);
 
   function isIosDevice() {
     const userAgent = window.navigator.userAgent.toLowerCase();
 
-    return (
-      /iphone|ipad|ipod/.test(userAgent) &&
-      !("MSStream" in window)
-    );
+    return /iphone|ipad|ipod/.test(userAgent) && !("MSStream" in window);
   }
 
   async function handleInstall() {
     if (isInstalled) {
+      setShowInstalledNotice(true);
       return;
     }
 
-    /*
-     * Native installation is always preferred.
-     * When Chromium exposes beforeinstallprompt, this opens
-     * the browser's real installation dialog immediately.
-     */
     if (installPrompt) {
       const prompt = installPrompt;
-
       setInstallPrompt(null);
 
       try {
-        const result = await prompt.prompt();
+        await prompt.prompt();
+        const choice = await prompt.userChoice;
 
-        if (result.outcome === "accepted") {
+        if (choice.outcome === "accepted") {
           setShowGuide(false);
         }
       } catch {
-        // Browser rejected the installation request.
+        // The browser may decline to show its installation prompt.
       }
 
       return;
     }
 
-    /*
-     * iOS does not expose beforeinstallprompt.
-     */
     if (isIosDevice()) {
       setGuidePlatform("ios");
       setShowGuide(true);
       return;
     }
 
-    /*
-     * No native installation prompt is currently available.
-     * This commonly happens during local HTTP/LAN development.
-     */
     setGuidePlatform("browser");
     setShowGuide(true);
   }
@@ -133,13 +112,55 @@ export default function InstallAppButton({
       <button
         type="button"
         onClick={handleInstall}
-        disabled={isInstalled}
+        aria-label={isInstalled ? "MooGold is already installed" : undefined}
         className={className}
       >
-        <Download className="h-3.5 w-3.5" />
-
+        {isInstalled ? (
+          <CheckCircle2 className="h-3.5 w-3.5" />
+        ) : (
+          <Download className="h-3.5 w-3.5" />
+        )}
         {isInstalled ? "MooGold Installed" : children}
       </button>
+
+      {showInstalledNotice && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-[#08150f]/50 p-4 backdrop-blur-sm"
+          onClick={() => setShowInstalledNotice(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="moogold-installed-title"
+            className="w-full max-w-sm rounded-[24px] border border-[#dfe7e2] bg-white p-6 text-center shadow-[0_25px_80px_rgba(15,45,32,.18)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#e8f6ef] text-[#138a5d]">
+              <CheckCircle2 className="h-7 w-7" />
+            </div>
+
+            <h3
+              id="moogold-installed-title"
+              className="mt-4 text-lg font-bold tracking-[-0.03em] text-[#17231e]"
+            >
+              MooGold is already installed
+            </h3>
+
+            <p className="mt-2 text-sm leading-6 text-[#78857e]">
+              You’re all set. Open MooGold from your Home Screen or app list
+              to continue.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setShowInstalledNotice(false)}
+              className="mt-5 h-11 w-full rounded-xl bg-[#138a5d] text-sm font-bold text-white"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
 
       {showGuide && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-[#08150f]/45 p-4 backdrop-blur-sm sm:items-center">
@@ -149,7 +170,6 @@ export default function InstallAppButton({
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#138a5d]">
                   MooGold App
                 </p>
-
                 <h3 className="mt-1 text-lg font-bold tracking-[-0.03em] text-[#17231e]">
                   Install MooGold
                 </h3>
@@ -168,17 +188,16 @@ export default function InstallAppButton({
             {guidePlatform === "ios" ? (
               <>
                 <p className="mt-4 text-[12px] leading-5 text-[#78857e]">
-                  Install MooGold from Safari and keep it on your
-                  Home Screen like a normal app.
+                  Install MooGold from Safari and keep it on your Home Screen
+                  like a normal app.
                 </p>
 
                 <div className="mt-5 space-y-2.5">
                   <Step
                     icon={<Share className="h-4 w-4" />}
                     title="1. Tap Share"
-                    text="Use Safari&apos;s Share button."
+                    text="Use Safari’s Share button."
                   />
-
                   <Step
                     icon={<Download className="h-4 w-4" />}
                     title="2. Add to Home Screen"
@@ -189,21 +208,20 @@ export default function InstallAppButton({
             ) : (
               <>
                 <p className="mt-4 text-[12px] leading-5 text-[#78857e]">
-                  Direct installation is not available from this
-                  browser session yet.
+                  If direct installation is unavailable, open Chrome’s menu
+                  and check whether an installation option is available.
                 </p>
 
                 <div className="mt-5 space-y-2.5">
                   <Step
                     icon={<Smartphone className="h-4 w-4" />}
-                    title="MooGold is almost ready"
-                    text="The direct Install App option becomes available when MooGold is served securely over HTTPS."
+                    title="MooGold App"
+                    text="Install MooGold when your browser offers the option."
                   />
-
                   <Step
                     icon={<MoreVertical className="h-4 w-4" />}
                     title="Chrome"
-                    text="On the hosted MooGold site, Chrome can show Install app when the PWA is installable."
+                    text="Look for Install app or Add to Home screen."
                   />
                 </div>
               </>
@@ -231,8 +249,7 @@ function getInstallState() {
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
     Boolean(
-      (window.navigator as Navigator & { standalone?: boolean })
-        .standalone,
+      (window.navigator as Navigator & { standalone?: boolean }).standalone,
     )
   );
 }
@@ -241,23 +258,17 @@ function getServerInstallState() {
   return false;
 }
 
-function subscribeToInstallState(
-  callback: () => void,
-) {
+function subscribeToInstallState(callback: () => void) {
   if (typeof window === "undefined") {
     return () => {};
   }
 
-  const mediaQuery = window.matchMedia(
-    "(display-mode: standalone)",
-  );
+  const mediaQuery = window.matchMedia("(display-mode: standalone)");
 
   mediaQuery.addEventListener("change", callback);
-  window.addEventListener("appinstalled", callback);
 
   return () => {
     mediaQuery.removeEventListener("change", callback);
-    window.removeEventListener("appinstalled", callback);
   };
 }
 
@@ -275,12 +286,8 @@ function Step({
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#138a5d] shadow-sm">
         {icon}
       </div>
-
       <div>
-        <p className="text-[11px] font-bold text-[#25352e]">
-          {title}
-        </p>
-
+        <p className="text-[11px] font-bold text-[#25352e]">{title}</p>
         <p className="mt-0.5 text-[10px] leading-4 text-[#8a9690]">
           {text}
         </p>

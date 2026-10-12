@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 
 import Sidebar from "@/components/dashboard/sidebar";
@@ -6,6 +6,7 @@ import Header from "@/components/dashboard/header";
 import MobileSidebar from "@/components/dashboard/mobile-sidebar";
 import MobileBottomNav from "@/components/dashboard/mobile-bottom-nav";
 import { DashboardProvider } from "@/components/dashboard/dashboard-provider";
+import RememberAccountPresence from "@/components/auth/remember-account-presence";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import {
@@ -75,6 +76,7 @@ export default async function DashboardLayout({
 
   return (
     <DashboardProvider>
+      <RememberAccountPresence />
       <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
         <div className="flex min-h-screen">
           <Sidebar

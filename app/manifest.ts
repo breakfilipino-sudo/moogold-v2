@@ -1,4 +1,4 @@
-import type { MetadataRoute } from "next";
+﻿import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "MooGold",
     description:
       "Your financial world for money, gold, crypto, gift cards and rewards.",
-    start_url: "/login",
+    start_url: "/",
     scope: "/",
     display: "standalone",
     display_override: ["standalone"],
