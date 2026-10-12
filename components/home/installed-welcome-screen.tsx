@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -275,24 +275,24 @@ export default function InstalledWelcomeScreen({
             {content.tagline}
           </p>
 
-          <div className="mt-7 grid grid-cols-2 gap-3">
+          <div className="mt-8 flex flex-col gap-4">
             <Link
               href="/login"
-              className="flex h-12 items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] px-4 text-sm font-semibold text-white transition hover:bg-white/10"
+              className="flex h-14 w-full items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] px-5 text-base font-semibold text-white transition hover:bg-white/10"
             >
               {content.login}
             </Link>
 
             <Link
               href="/register"
-              className="flex h-12 items-center justify-center rounded-xl bg-[#d5b56e] px-4 text-sm font-bold text-[#14251c] transition hover:bg-[#e3c783]"
+              className="flex h-14 w-full items-center justify-center rounded-xl bg-[#d5b56e] px-5 text-base font-bold text-[#14251c] transition hover:bg-[#e3c783]"
             >
               {content.createAccount}
             </Link>
           </div>
         </div>
 
-        <section className="mt-12" aria-label="MooGold services">
+        <section className="mt-16 sm:mt-20" aria-label="MooGold services">
           <div
             className="relative min-h-[160px] overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-5 sm:p-6"
             aria-live="polite"
