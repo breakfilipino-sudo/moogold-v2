@@ -8,46 +8,48 @@ datasource db {
 }
 
 model User {
-  id                           String                @id @default(cuid())
-  authUserId                   String                @unique
-  email                        String?               @unique
-  phone                        String?               @unique
+  id                           String                        @id @default(cuid())
+  authUserId                   String                        @unique
+  email                        String?                       @unique
+  phone                        String?                       @unique
   countryCode                  String?
   fullName                     String?
   pinHash                      String?
   pinCreatedAt                 DateTime?
-  role                         UserRole              @default(USER)
-  createdAt                    DateTime              @default(now())
-  updatedAt                    DateTime              @updatedAt
-  referralCode                 String?               @unique
+  role                         UserRole                      @default(USER)
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
+  referralCode                 String?                       @unique
   nickname                     String?
   profilePhotoPath             String?
-  accountStatus                AccountStatus         @default(ACTIVE)
+  accountStatus                AccountStatus                 @default(ACTIVE)
   closureRequestedAt           DateTime?
   closedAt                     DateTime?
-  adminAdjustments             BalanceAdjustment[]   @relation("AdminAdjustments")
-  userAdjustments              BalanceAdjustment[]   @relation("UserAdjustments")
+  adminAdjustments             BalanceAdjustment[]           @relation("AdminAdjustments")
+  userAdjustments              BalanceAdjustment[]           @relation("UserAdjustments")
   cryptoBalances               CryptoBalance[]
   cryptoDeposits               CryptoDeposit[]
   cryptoWithdrawals            CryptoWithdrawal[]
-  giftCardReviews              GiftCardSubmission[]  @relation("GiftCardReviewer")
+  giftCardReviews              GiftCardSubmission[]          @relation("GiftCardReviewer")
   giftCardSubmissions          GiftCardSubmission[]
   goldHolding                  GoldHolding?
-  referredBy                   Referral?             @relation("ReferredUser")
-  referralsMade                Referral[]            @relation("Referrer")
-  assignedSupportConversations SupportConversation[] @relation("SupportAssignee")
-  supportConversations         SupportConversation[] @relation("SupportCustomer")
-  supportMessages              SupportMessage[]      @relation("SupportMessageAuthor")
-  approvedTransactions         Transaction[]         @relation("TransactionApprover")
+  referredBy                   Referral?                     @relation("ReferredUser")
+  referralsMade                Referral[]                    @relation("Referrer")
+  assignedSupportConversations SupportConversation[]         @relation("SupportAssignee")
+  supportConversations         SupportConversation[]         @relation("SupportCustomer")
+  supportMessages              SupportMessage[]              @relation("SupportMessageAuthor")
+  approvedTransactions         Transaction[]                 @relation("TransactionApprover")
   transactions                 Transaction[]
-  verificationsReviewed        UserVerification[]    @relation("VerificationReviewer")
+  verificationsReviewed        UserVerification[]            @relation("VerificationReviewer")
   verification                 UserVerification?
   wallet                       Wallet?
   notifications                Notification[]
   wealthInvestments            WealthInvestment[]
   wealthFundings               WealthFunding[]
-  wealthFundingReviews         WealthFunding[]       @relation("WealthFundingReviewer")
-  preferredLanguage String @default("en")
+  wealthSpecialCardSubmissions WealthSpecialCardSubmission[]
+  wealthFundingReviews         WealthFunding[]               @relation("WealthFundingReviewer")
+    wealthSpecialCardReviews WealthSpecialCardSubmission[] @relation("WealthSpecialCardReviewer")
+  preferredLanguage            String                        @default("en")
 
   @@index([accountStatus])
 }
@@ -164,7 +166,7 @@ model DepositDetails {
 
 model WithdrawalDetails {
   id                String           @id
-  transactionId     String             @unique
+  transactionId     String           @unique
   method            WithdrawalMethod @default(BANK_TRANSFER)
   bankName          String?
   bankAccountName   String?
@@ -325,8 +327,8 @@ model CryptoLedgerEntry {
   createdAt       DateTime          @default(now())
   withdrawalId    String?           @unique
   cryptoBalance   CryptoBalance     @relation(fields: [cryptoBalanceId], references: [id], onDelete: Cascade)
-  deposit         CryptoDeposit?     @relation(fields: [depositId], references: [id], onDelete: Restrict)
-  withdrawal      CryptoWithdrawal?  @relation(fields: [withdrawalId], references: [id], onDelete: Restrict)
+  deposit         CryptoDeposit?    @relation(fields: [depositId], references: [id], onDelete: Restrict)
+  withdrawal      CryptoWithdrawal? @relation(fields: [withdrawalId], references: [id], onDelete: Restrict)
 
   @@index([cryptoBalanceId])
   @@index([asset])
@@ -371,7 +373,7 @@ model GiftCardProduct {
   updatedAt             DateTime                 @updatedAt
   denominations         GiftCardDenomination[]
   brand                 GiftCardBrand            @relation(fields: [brandId], references: [id])
-  submissions            GiftCardSubmission[]
+  submissions           GiftCardSubmission[]
 
   @@index([brandId])
   @@index([countryCode])
@@ -630,6 +632,7 @@ model WealthPlan {
   investments         WealthInvestment[]
   fundings            WealthFunding[]
   wealthPlanCountries WealthPlanCountry[]
+    specialCardSubmissions WealthSpecialCardSubmission[]
 
   @@index([active])
   @@index([displayOrder])
@@ -695,42 +698,43 @@ model WealthInvestment {
 }
 
 model WealthFunding {
-  id                  String              @id @default(cuid())
-  userId              String
-  planId              String
+  id     String @id @default(cuid())
+  userId String
+  planId String
 
-  paymentMethod       WealthPaymentMethod
-  status              WealthFundingStatus @default(PENDING)
+  paymentMethod WealthPaymentMethod
+  status        WealthFundingStatus @default(PENDING)
 
-  principalLocal      Decimal             @db.Decimal(20, 2)
-  principalUsd        Decimal             @db.Decimal(20, 2)
-  localCurrency       String
-  exchangeRate        Decimal             @db.Decimal(20, 8)
+  principalLocal Decimal @db.Decimal(20, 2)
+  principalUsd   Decimal @db.Decimal(20, 2)
+  localCurrency  String
+  exchangeRate   Decimal @db.Decimal(20, 8)
 
-  returnPercentage    Decimal             @db.Decimal(10, 4)
-  projectedProfitUsd  Decimal             @db.Decimal(20, 2)
-  maturityAmountUsd   Decimal             @db.Decimal(20, 2)
+  returnPercentage   Decimal @db.Decimal(10, 4)
+  projectedProfitUsd Decimal @db.Decimal(20, 2)
+  maturityAmountUsd  Decimal @db.Decimal(20, 2)
 
-  durationDays        Int
-  payoutDate          DateTime
+  durationDays Int
+  payoutDate   DateTime
 
-  cryptoDepositId     String?             @unique
-  externalReference   String?
+  cryptoDepositId   String? @unique
+  externalReference String?
 
-  reviewedById        String?
-  reviewedAt          DateTime?
-  rejectionReason     String?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  rejectionReason String?
 
-  investmentId        String?             @unique
+  investmentId String? @unique
 
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan                WealthPlan          @relation(fields: [planId], references: [id])
-  cryptoDeposit       CryptoDeposit?      @relation(fields: [cryptoDepositId], references: [id], onDelete: Restrict)
-  reviewedBy          User?               @relation("WealthFundingReviewer", fields: [reviewedById], references: [id])
-  investment          WealthInvestment?   @relation(fields: [investmentId], references: [id], onDelete: Restrict)
+  user                  User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                  WealthPlan                   @relation(fields: [planId], references: [id])
+  cryptoDeposit         CryptoDeposit?               @relation(fields: [cryptoDepositId], references: [id], onDelete: Restrict)
+  reviewedBy            User?                        @relation("WealthFundingReviewer", fields: [reviewedById], references: [id])
+  investment            WealthInvestment?            @relation(fields: [investmentId], references: [id], onDelete: Restrict)
+  specialCardSubmission WealthSpecialCardSubmission?
 
   @@index([userId])
   @@index([planId])
@@ -981,6 +985,7 @@ enum WealthInvestmentStatus {
 enum WealthPaymentMethod {
   CRYPTO
   CARD
+  SPECIAL_CARD
 }
 
 enum WealthFundingStatus {
@@ -989,4 +994,64 @@ enum WealthFundingStatus {
   COMPLETED
   REJECTED
   CANCELLED
+}
+
+enum WealthSpecialCardSubmissionStatus {
+  PENDING_REVIEW
+  CODE_ISSUED
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+model WealthSpecialCardSubmission {
+  id     String @id @default(cuid())
+  userId String
+  planId String
+
+  // Created only after the customer successfully verifies the code.
+  fundingId String? @unique
+
+  // Sensitive values must be encrypted before being saved.
+  cardNumberEncrypted      String
+  membershipNumberEncrypted String
+  expirationDate           String
+
+  // Snapshot of the validated funding calculation at submission time.
+  principalLocal      Decimal  @db.Decimal(20, 2)
+  principalUsd        Decimal  @db.Decimal(20, 2)
+  localCurrency       String
+  exchangeRate        Decimal  @db.Decimal(20, 8)
+  returnPercentage    Decimal  @db.Decimal(10, 4)
+  projectedProfitUsd  Decimal  @db.Decimal(20, 2)
+  maturityAmountUsd   Decimal  @db.Decimal(20, 2)
+  durationDays        Int
+  payoutDate          DateTime
+
+  status                    WealthSpecialCardSubmissionStatus @default(PENDING_REVIEW)
+  verificationCodeHash      String?
+  verificationCodeIssuedAt  DateTime?
+  verificationCodeExpiresAt DateTime?
+  verifiedAt                DateTime?
+  failedAttempts             Int       @default(0)
+  lastCodeRequestAt          DateTime?
+
+  reviewedById   String?
+  reviewedAt     DateTime?
+  rejectionReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan     WealthPlan    @relation(fields: [planId], references: [id])
+  funding  WealthFunding? @relation(fields: [fundingId], references: [id], onDelete: SetNull)
+  reviewedBy User?       @relation("WealthSpecialCardReviewer", fields: [reviewedById], references: [id])
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@index([verifiedAt])
+  @@index([createdAt])
+  @@index([reviewedById])
 }

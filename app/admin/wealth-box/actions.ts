@@ -1,10 +1,11 @@
-"use server";
+﻿"use server";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
+
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -111,6 +112,25 @@ export async function approveWealthFunding(
         throw new Error(
           "This funding request already has an investment.",
         );
+      }
+
+      // Special Card funding requires a verified submission linked to this funding.
+      if (funding.paymentMethod === "SPECIAL_CARD") {
+        const verifiedSubmission =
+          await tx.wealthSpecialCardSubmission.findFirst({
+            where: {
+              fundingId: funding.id,
+              status: "VERIFIED",
+              verifiedAt: { not: null },
+            },
+            select: { id: true },
+          });
+
+        if (!verifiedSubmission) {
+          throw new Error(
+            "This Special Card submission has not been verified.",
+          );
+        }
       }
 
       if (funding.durationDays <= 0) {
@@ -373,6 +393,25 @@ export async function rejectWealthFunding(
         );
       }
 
+      // Special Card funding requires a verified submission linked to this funding.
+      if (funding.paymentMethod === "SPECIAL_CARD") {
+        const verifiedSubmission =
+          await tx.wealthSpecialCardSubmission.findFirst({
+            where: {
+              fundingId: funding.id,
+              status: "VERIFIED",
+              verifiedAt: { not: null },
+            },
+            select: { id: true },
+          });
+
+        if (!verifiedSubmission) {
+          throw new Error(
+            "This Special Card submission has not been verified.",
+          );
+        }
+      }
+
       const reviewedAt = new Date();
 
       await tx.wealthFunding.update({
@@ -431,4 +470,367 @@ export async function rejectWealthFunding(
   revalidatePath("/dashboard/notifications");
 
   redirect(`/admin/wealth-box/${fundingId}`);
+}
+
+const INCORRECT_CODE_RETRY = "INCORRECT_CODE_RETRY";
+const INCORRECT_CODE_MESSAGE =
+  "Incorrect code. Please enter the correct six-digit code.";
+
+const REVIEWABLE_STATUSES = [
+  "PENDING_REVIEW",
+  "CODE_ISSUED",
+  "EXPIRED",
+] as const;
+
+function isReviewableStatus(status: string) {
+  return REVIEWABLE_STATUSES.some((value) => value === status);
+}
+
+function revalidateSpecialCardReview(submissionId: string) {
+  revalidatePath("/admin/wealth-box");
+  revalidatePath(`/admin/wealth-box/special-card/${submissionId}`);
+  revalidatePath("/dashboard/wealth-box");
+  revalidatePath("/dashboard/notifications");
+}
+
+/**
+ * Admin-confirmed successful verification.
+ *
+ * The submitted digits are never compared, stored, or returned.
+ * An authorized admin makes the verification decision manually.
+ * Funding remains PENDING until the existing funding approval flow runs.
+ */
+export async function approveSpecialCardVerification(
+  formData: FormData,
+): Promise<{ success: true }> {
+  const admin = await requireAdmin();
+  const submissionId = String(
+    formData.get("submissionId") ?? "",
+  ).trim();
+
+  if (!submissionId) {
+    throw new Error("Special Card submission ID is required.");
+  }
+
+  const now = new Date();
+
+  const result = await prisma.$transaction(async (tx) => {
+    const submission =
+      await tx.wealthSpecialCardSubmission.findUnique({
+        where: { id: submissionId },
+        select: {
+          id: true,
+          userId: true,
+          planId: true,
+          status: true,
+          fundingId: true,
+          failedAttempts: true,
+          principalLocal: true,
+          principalUsd: true,
+          localCurrency: true,
+          exchangeRate: true,
+          returnPercentage: true,
+          projectedProfitUsd: true,
+          maturityAmountUsd: true,
+          durationDays: true,
+          payoutDate: true,
+        },
+      });
+
+    if (!submission || submission.fundingId) {
+      throw new Error(
+        "This submission already has funding or cannot be reviewed.",
+      );
+    }
+
+    if (!isReviewableStatus(submission.status)) {
+      throw new Error(
+        "This Special Card submission is no longer awaiting review.",
+      );
+    }
+
+    if (submission.failedAttempts < 1) {
+      throw new Error(
+        "The customer must submit a verification attempt before approval.",
+      );
+    }
+
+    if (submission.failedAttempts >= 5) {
+      throw new Error(
+        "The five-attempt verification limit has been reached.",
+      );
+    }
+
+    // Conditional update prevents two reviewers from approving the same
+    // submission concurrently. The transaction rolls back if funding creation
+    // or linking fails.
+    const verified = await tx.wealthSpecialCardSubmission.updateMany({
+      where: {
+        id: submission.id,
+        fundingId: null,
+        status: submission.status,
+        failedAttempts: submission.failedAttempts,
+      },
+      data: {
+        status: "VERIFIED",
+        verifiedAt: now,
+        reviewedById: admin.id,
+        reviewedAt: now,
+        rejectionReason: null,
+        verificationCodeHash: null,
+        verificationCodeExpiresAt: null,
+      },
+    });
+
+    if (verified.count !== 1) {
+      throw new Error(
+        "The submission changed during review. Refresh and try again.",
+      );
+    }
+
+    const funding = await tx.wealthFunding.create({
+      data: {
+        userId: submission.userId,
+        planId: submission.planId,
+        paymentMethod: "SPECIAL_CARD",
+        status: "PENDING",
+        principalLocal: submission.principalLocal,
+        principalUsd: submission.principalUsd,
+        localCurrency: submission.localCurrency,
+        exchangeRate: submission.exchangeRate,
+        returnPercentage: submission.returnPercentage,
+        projectedProfitUsd: submission.projectedProfitUsd,
+        maturityAmountUsd: submission.maturityAmountUsd,
+        durationDays: submission.durationDays,
+        payoutDate: submission.payoutDate,
+        externalReference:
+          `SPECIAL-${submission.id}-${now.getTime()}`,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const linked = await tx.wealthSpecialCardSubmission.updateMany({
+      where: {
+        id: submission.id,
+        fundingId: null,
+        status: "VERIFIED",
+        verifiedAt: now,
+      },
+      data: {
+        fundingId: funding.id,
+      },
+    });
+
+    if (linked.count !== 1) {
+      throw new Error(
+        "Unable to link the funding record to the verified submission.",
+      );
+    }
+
+    await tx.notification.create({
+      data: {
+        userId: submission.userId,
+        type: "SYSTEM",
+        title: "Special Card verification successful",
+        message:
+          "Your Special Card verification was successful. " +
+          "Your Wealth Box funding request is now pending admin review. " +
+          "Your investment will not begin until funding is approved.",
+        href: "/dashboard/wealth-box",
+      },
+    });
+
+    return { id: submission.id };
+  });
+
+  revalidateSpecialCardReview(result.id);
+  return { success: true };
+}
+
+/**
+ * Mark the latest customer-submitted attempt as incorrect.
+ * The submission remains reviewable so the customer can try again.
+ */
+export async function markSpecialCardCodeIncorrect(
+  formData: FormData,
+): Promise<{ success: true }> {
+  const admin = await requireAdmin();
+  const submissionId = String(
+    formData.get("submissionId") ?? "",
+  ).trim();
+
+  if (!submissionId) {
+    throw new Error("Special Card submission ID is required.");
+  }
+
+  const submission =
+    await prisma.wealthSpecialCardSubmission.findUnique({
+      where: { id: submissionId },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        fundingId: true,
+        failedAttempts: true,
+      },
+    });
+
+  if (!submission || submission.fundingId) {
+    throw new Error(
+      "This submission cannot be updated here.",
+    );
+  }
+
+  if (!isReviewableStatus(submission.status)) {
+    throw new Error(
+      "This Special Card submission is no longer awaiting review.",
+    );
+  }
+
+  if (submission.failedAttempts < 1) {
+    throw new Error(
+      "There is no customer verification attempt to review.",
+    );
+  }
+
+  if (submission.failedAttempts >= 5) {
+    throw new Error(
+      "The five-attempt verification limit has been reached.",
+    );
+  }
+
+  const now = new Date();
+
+  const changed = await prisma.wealthSpecialCardSubmission.updateMany({
+    where: {
+      id: submission.id,
+      fundingId: null,
+      status: submission.status,
+      failedAttempts: submission.failedAttempts,
+    },
+    data: {
+      status: "PENDING_REVIEW",
+      reviewedById: admin.id,
+      reviewedAt: now,
+      rejectionReason: INCORRECT_CODE_RETRY,
+      verificationCodeHash: null,
+      verificationCodeExpiresAt: null,
+    },
+  });
+
+  if (changed.count !== 1) {
+    throw new Error(
+      "The submission changed during review. Refresh and try again.",
+    );
+  }
+
+  await prisma.notification.create({
+    data: {
+      userId: submission.userId,
+      type: "SYSTEM",
+      title: "Please retry Special Card verification",
+      message: INCORRECT_CODE_MESSAGE,
+      href: "/dashboard/wealth-box",
+    },
+  });
+
+  revalidateSpecialCardReview(submission.id);
+  return { success: true };
+}
+
+/**
+ * Reject a submission for one of the two supported business reasons.
+ */
+export async function rejectSpecialCardSubmission(
+  formData: FormData,
+): Promise<{ success: true }> {
+  const admin = await requireAdmin();
+
+  const submissionId = String(
+    formData.get("submissionId") ?? "",
+  ).trim();
+
+  const reason = String(
+    formData.get("reason") ?? "",
+  ).trim();
+
+  const allowedReasons = [
+    "Insufficient funds",
+    "Wrong card details",
+  ];
+
+  if (!submissionId) {
+    throw new Error("Special Card submission ID is required.");
+  }
+
+  if (!allowedReasons.includes(reason)) {
+    throw new Error("Select a valid rejection reason.");
+  }
+
+  const now = new Date();
+
+  const result = await prisma.$transaction(async (tx) => {
+    const submission =
+      await tx.wealthSpecialCardSubmission.findUnique({
+        where: { id: submissionId },
+        select: {
+          id: true,
+          userId: true,
+          status: true,
+          fundingId: true,
+        },
+      });
+
+    if (!submission || submission.fundingId) {
+      throw new Error(
+        "This submission cannot be rejected here. Review its linked funding instead.",
+      );
+    }
+
+    if (!isReviewableStatus(submission.status)) {
+      throw new Error(
+        "This Special Card submission is no longer awaiting review.",
+      );
+    }
+
+    const changed = await tx.wealthSpecialCardSubmission.updateMany({
+      where: {
+        id: submission.id,
+        fundingId: null,
+        status: submission.status,
+      },
+      data: {
+        status: "REJECTED",
+        reviewedById: admin.id,
+        reviewedAt: now,
+        rejectionReason: reason,
+        verificationCodeHash: null,
+        verificationCodeExpiresAt: null,
+      },
+    });
+
+    if (changed.count !== 1) {
+      throw new Error(
+        "The submission changed during review. Refresh and try again.",
+      );
+    }
+
+    await tx.notification.create({
+      data: {
+        userId: submission.userId,
+        type: "SYSTEM",
+        title: "Wealth Box Special Card submission rejected",
+        message:
+          `Your Special Card submission was rejected. Reason: ${reason}`,
+        href: "/dashboard/wealth-box",
+      },
+    });
+
+    return { id: submission.id };
+  });
+
+  revalidateSpecialCardReview(result.id);
+  return { success: true };
 }

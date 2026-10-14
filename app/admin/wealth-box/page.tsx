@@ -115,6 +115,39 @@ transactionHash: true,
 },
 });
 
+const specialCardSubmissions =
+  await prisma.wealthSpecialCardSubmission.findMany({
+    where: {
+      status: {
+        in: ["PENDING_REVIEW", "CODE_ISSUED", "EXPIRED"],
+      },
+      fundingId: null,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    select: {
+      id: true,
+      status: true,
+      principalLocal: true,
+      principalUsd: true,
+      localCurrency: true,
+      createdAt: true,
+      user: {
+        select: {
+          fullName: true,
+          email: true,
+          phone: true,
+        },
+      },
+      plan: {
+        select: {
+          name: true,
+          durationDays: true,
+        },
+      },
+    },
+  });
 const pendingCount = fundings.filter(
 (funding) => funding.status === "PENDING",
 ).length;
@@ -196,7 +229,101 @@ Back to Admin </Link>
       </div>
     </div>
 
-    <section className="mt-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <section className="mt-8 overflow-hidden rounded-3xl border border-amber-200 bg-white shadow-sm">
+  <div className="flex flex-col gap-2 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <h2 className="text-xl font-black text-slate-900">
+        Special Card Submissions
+      </h2>
+      <p className="mt-1 text-sm text-slate-500">
+        Review verification attempts and approve or reject submissions before funding is created.
+      </p>
+    </div>
+    <span className="inline-flex w-fit rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+      {specialCardSubmissions.length} awaiting review
+    </span>
+  </div>
+
+  {specialCardSubmissions.length === 0 ? (
+    <div className="px-6 py-10 text-center">
+      <p className="font-bold text-slate-900">
+        No Special Card submissions awaiting review
+      </p>
+      <p className="mt-1 text-sm text-slate-500">
+        New submissions will appear here.
+      </p>
+    </div>
+  ) : (
+    <div className="divide-y divide-slate-100">
+      {specialCardSubmissions.map((submission) => {
+        const customerName =
+          submission.user.fullName ||
+          submission.user.email ||
+          submission.user.phone ||
+          "Unknown customer";
+
+        return (
+          <div
+            key={submission.id}
+            className="flex flex-col gap-4 p-6 transition hover:bg-slate-50 md:flex-row md:items-center md:justify-between"
+          >
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                  Special Card
+                </span>
+                <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+                  submission.status === "CODE_ISSUED"
+                    ? "bg-blue-100 text-blue-700"
+                    : "bg-amber-100 text-amber-800"
+                }`}>
+                  {submission.status === "CODE_ISSUED"
+                    ? "Awaiting manual review"
+                    : "Awaiting manual review"}
+                </span>
+              </div>
+
+              <p className="mt-2 font-bold text-slate-900">
+                {customerName}
+              </p>
+
+              <p className="mt-1 text-sm text-slate-500">
+                {submission.plan.name} Â· {submission.plan.durationDays} days
+              </p>
+
+              <p className="mt-1 text-xs text-slate-400">
+                Submitted {formatDate(submission.createdAt)}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between md:justify-end">
+              <div className="md:text-right">
+                <p className="text-lg font-black text-slate-900">
+                  {formatCurrency(
+                    Number(submission.principalLocal),
+                    submission.localCurrency,
+                  )}
+                </p>
+                <p className="mt-1 text-xs font-semibold text-slate-400">
+                  {formatCurrency(Number(submission.principalUsd), "USD")}
+                </p>
+              </div>
+
+              <Link
+                href={`/admin/wealth-box/special-card/${submission.id}`}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+              >
+                Review submission
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  )}
+</section>
+<section className="mt-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 px-6 py-5">
         <h2 className="text-xl font-black text-slate-900">
           Wealth Box Funding
@@ -267,8 +394,8 @@ Back to Admin </Link>
                       </p>
 
                       <p className="mt-1 text-sm text-slate-500">
-                        {funding.plan.name} ·{" "}
-                        {funding.durationDays} days ·{" "}
+                        {funding.plan.name} Â·{" "}
+                        {funding.durationDays} days Â·{" "}
                         {Number(
                           funding.returnPercentage,
                         )}
@@ -323,7 +450,7 @@ Back to Admin </Link>
                 "CRYPTO" ? (
                   <div className="mt-4 rounded-2xl bg-violet-50 px-4 py-3">
                     <p className="text-xs font-bold text-violet-800">
-                      {funding.cryptoDeposit?.asset} ·{" "}
+                      {funding.cryptoDeposit?.asset} Â·{" "}
                       {
                         funding.cryptoDeposit
                           ?.network

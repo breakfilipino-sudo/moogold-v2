@@ -10,6 +10,8 @@ User,
 import { notFound } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 
 import {
 approveWealthFunding,
@@ -70,6 +72,24 @@ export default async function AdminWealthBoxDetailPage({
 params,
 }: PageProps) {
 const { id } = await params;
+
+const supabase = await createClient();
+const {
+  data: { user: authUser },
+} = await supabase.auth.getUser();
+
+if (!authUser) {
+  redirect("/login");
+}
+
+const adminUser = await prisma.user.findUnique({
+  where: { authUserId: authUser.id },
+  select: { role: true },
+});
+
+if (adminUser?.role !== "ADMIN") {
+  redirect("/dashboard");
+}
 
 const funding =
 await prisma.wealthFunding.findUnique({
@@ -183,10 +203,11 @@ Back to Wealth Box </Link>
               </p>
 
               <h2 className="mt-1 text-lg font-black text-slate-900">
-                {funding.paymentMethod ===
-                "CRYPTO"
+                {funding.paymentMethod === "CRYPTO"
                   ? "Crypto payment"
-                  : "Credit / debit card"}
+                  : funding.paymentMethod === "SPECIAL_CARD"
+                    ? "Special Card submission"
+                    : "Credit / debit card"}
               </h2>
             </div>
           </div>

