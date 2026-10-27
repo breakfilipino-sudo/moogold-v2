@@ -30,6 +30,25 @@ export async function getNotificationSummary() {
   };
 }
 
+export async function getUnreadNotificationCountAction() {
+  const { user } = await getCurrentUser();
+  return getUnreadNotificationCount(user.id);
+}
+
+export async function getRecentNotificationUpdates() {
+  const { user } = await getCurrentUser();
+  const notifications = await getNotifications(user.id, 10);
+
+  return notifications.map((notification) => ({
+    id: notification.id,
+    type: notification.type,
+    title: notification.title,
+    message: notification.message,
+    href: notification.href,
+    readAt: notification.readAt?.toISOString() ?? null,
+    createdAt: notification.createdAt.toISOString(),
+  }));
+}
 export async function markNotificationRead(
   notificationId: string,
 ) {

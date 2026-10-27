@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
+import { getCryptoUsdPrices } from "@/lib/crypto/prices";
 import { createClient } from "@/lib/supabase/server";
 
 async function requireAdmin() {
@@ -101,6 +103,7 @@ export async function approveCryptoDeposit(
   }
 
   try {
+    const cryptoUsdPrices = await getCryptoUsdPrices();
     await prisma.$transaction(
       async (tx) => {
         const deposit =
@@ -165,9 +168,10 @@ export async function approveCryptoDeposit(
 
         const approvedAt = new Date();
 
-        await tx.cryptoDeposit.update({
+        const claimedDeposit = await tx.cryptoDeposit.updateMany({
           where: {
             id: deposit.id,
+            status: "PENDING",
           },
           data: {
             amount: verifiedAmount,
@@ -186,6 +190,12 @@ export async function approveCryptoDeposit(
               "Crypto deposit approved after manual blockchain verification.",
           },
         });
+
+        if (claimedDeposit.count !== 1) {
+          throw new Error(
+            "This crypto deposit has already been reviewed. Refresh the page and check its current status.",
+          );
+        }
 
         await tx.cryptoLedgerEntry.create({
           data: {
@@ -224,17 +234,91 @@ export async function approveCryptoDeposit(
             "The crypto balance changed while this deposit was being approved. Please try again.",
           );
         }
+        let notificationMessage =
+          `${verifiedAmount} ${deposit.asset} has been added to your MooGold crypto wallet.`;
+
+        const depositUsdPrice = cryptoUsdPrices[deposit.asset];
+
+        if (
+          typeof depositUsdPrice === "number" &&
+          Number.isFinite(depositUsdPrice) &&
+          depositUsdPrice > 0 &&
+          verifiedAmount * depositUsdPrice >= 1000
+        ) {
+          const existingBonus = await tx.cryptoDepositBonus.findUnique({
+            where: { userId: deposit.userId },
+            select: { id: true },
+          });
+
+          if (!existingBonus) {
+            const bonusAmount = new Prisma.Decimal("300")
+              .div(String(depositUsdPrice))
+              .toDecimalPlaces(18, Prisma.Decimal.ROUND_DOWN);
+
+            if (bonusAmount.gt(0)) {
+              const bonusBalanceBefore = balanceAfter;
+              const bonusBalanceAfter =
+                bonusBalanceBefore.add(bonusAmount);
+
+              const bonusBalanceUpdate =
+                await tx.cryptoBalance.updateMany({
+                  where: {
+                    id: cryptoBalance.id,
+                    balance: bonusBalanceBefore,
+                  },
+                  data: { balance: bonusBalanceAfter },
+                });
+
+              if (bonusBalanceUpdate.count !== 1) {
+                throw new Error(
+                  "The crypto balance changed while applying the bonus. Please retry approval.",
+                );
+              }
+
+              await tx.cryptoDepositBonus.create({
+                data: {
+                  userId: deposit.userId,
+                  qualifyingDepositId: deposit.id,
+                  cryptoBalanceId: cryptoBalance.id,
+                  asset: deposit.asset,
+                  network: deposit.network,
+                  amount: bonusAmount,
+                  usdValue: new Prisma.Decimal("300.00"),
+                  exchangeRate: new Prisma.Decimal(
+                    String(depositUsdPrice),
+                  ).toDecimalPlaces(8),
+                },
+              });
+
+              await tx.cryptoLedgerEntry.create({
+                data: {
+                  cryptoBalanceId: cryptoBalance.id,
+                  asset: deposit.asset,
+                  network: deposit.network,
+                  direction: "CREDIT",
+                  amount: bonusAmount,
+                  balanceBefore: bonusBalanceBefore,
+                  balanceAfter: bonusBalanceAfter,
+                  description:
+                    `One-time $300 USD crypto deposit milestone bonus: ${deposit.id}`,
+                },
+              });
+
+              notificationMessage +=
+                ` You also received a one-time $300 USD-equivalent crypto bonus (${bonusAmount.toString()} ${deposit.asset}).`;
+            }
+          }
+        }
 
         await tx.notification.create({
-  data: {
-    userId: deposit.userId,
-    type: "CRYPTO_DEPOSIT",
-    title: "You have received",
-    message:
-      `${verifiedAmount} ${deposit.asset} has been added to your MooGold crypto wallet.`,
-    href: `/dashboard/crypto/deposit/${depositId}`,
-  },
-});
+          data: {
+            userId: deposit.userId,
+            type: "CRYPTO_DEPOSIT",
+            title: "You have received",
+            message: notificationMessage,
+            href: `/dashboard/crypto/deposit/${depositId}`,
+          },
+        });
       },
       {
         isolationLevel: "Serializable",
@@ -333,9 +417,10 @@ export async function rejectCryptoDeposit(
         );
       }
 
-      await tx.cryptoDeposit.update({
+      const claimedDeposit = await tx.cryptoDeposit.updateMany({
         where: {
           id: deposit.id,
+          status: "PENDING",
         },
         data: {
           status: "REJECTED",
@@ -345,6 +430,12 @@ export async function rejectCryptoDeposit(
             `Crypto deposit rejected: ${reason}`,
         },
       });
+
+      if (claimedDeposit.count !== 1) {
+        throw new Error(
+          "This crypto deposit has already been reviewed. Refresh the page and check its current status.",
+        );
+      }
 
       await tx.notification.create({
         data: {
@@ -356,7 +447,11 @@ export async function rejectCryptoDeposit(
           href: `/dashboard/crypto/deposit/${depositId}`,
         },
       });
-    });
+      },
+      {
+        isolationLevel: "Serializable",
+      },
+    );
   } catch (error) {
     console.error(
       "Failed to reject crypto deposit:",

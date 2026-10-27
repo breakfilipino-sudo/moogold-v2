@@ -1,14 +1,13 @@
-
 "use client";
 
 import {
   ArrowLeft,
-  ArrowRight,
   CreditCard,
 } from "lucide-react";
 import { useActionState, useEffect, useState } from "react";
 
 import type { LanguageCode } from "@/lib/i18n/languages";
+import { getMinimumTopUpAmount } from "@/lib/deposit/minimum-top-up";
 import { requestDeposit } from "./actions";
 
 type DepositFormProps = {
@@ -24,7 +23,6 @@ type FormState = {
 };
 
 type DepositLabels = {
-  walletAccount: string;
   amountPrompt: string;
   maxExceeded: string;
   exchangeRateUnavailable: string;
@@ -41,64 +39,60 @@ type DepositLabels = {
 
 const LABELS: Record<LanguageCode, DepositLabels> = {
   en: {
-    walletAccount: "MooGold wallet",
-    amountPrompt: "How much would you like to add?",
+    amountPrompt: "Enter amount",
     maxExceeded: "Maximum deposit amount exceeded",
     exchangeRateUnavailable: "Exchange rate unavailable. Please try again.",
-    paymentMethod: "Payment method",
+    paymentMethod: "Deposit method",
     creditDebitCard: "Credit / Debit Card",
     cardProviders: "Visa, Mastercard and more",
-    paymentReference: "Payment reference",
+    paymentReference: "Note",
     optional: "optional",
-    referencePlaceholder: "Enter a reference if you have one",
+    referencePlaceholder: "Add a note (optional)",
     back: "Back",
     preparing: "Preparing...",
-    reviewDeposit: "Review Add Fund",
+    reviewDeposit: "Continue",
   },
   fil: {
-    walletAccount: "MooGold wallet",
-    amountPrompt: "Magkano ang nais mong idagdag?",
+    amountPrompt: "Ilagay ang halaga",
     maxExceeded: "Lumampas sa maximum na halaga ng deposito",
     exchangeRateUnavailable: "Hindi available ang exchange rate. Pakisubukang muli.",
-    paymentMethod: "Paraan ng pagbabayad",
+    paymentMethod: "Deposit method",
     creditDebitCard: "Credit / Debit Card",
     cardProviders: "Visa, Mastercard at iba pa",
-    paymentReference: "Reference ng pagbabayad",
+    paymentReference: "Note",
     optional: "opsyonal",
-    referencePlaceholder: "Ilagay ang reference kung mayroon",
+    referencePlaceholder: "Magdagdag ng nota",
     back: "Bumalik",
     preparing: "Inihahanda...",
-    reviewDeposit: "Suriin ang Dagdag na Pondo",
+    reviewDeposit: "Magpatuloy",
   },
   ms: {
-    walletAccount: "Dompet MooGold",
-    amountPrompt: "Berapakah jumlah yang ingin anda tambah?",
+    amountPrompt: "Masukkan jumlah",
     maxExceeded: "Jumlah deposit melebihi had maksimum",
     exchangeRateUnavailable: "Kadar pertukaran tidak tersedia. Sila cuba lagi.",
-    paymentMethod: "Kaedah pembayaran",
+    paymentMethod: "Deposit method",
     creditDebitCard: "Kad Kredit / Debit",
     cardProviders: "Visa, Mastercard dan lain-lain",
-    paymentReference: "Rujukan pembayaran",
+    paymentReference: "Note",
     optional: "pilihan",
-    referencePlaceholder: "Masukkan rujukan jika ada",
+    referencePlaceholder: "Tambah nota",
     back: "Kembali",
     preparing: "Sedang menyediakan...",
-    reviewDeposit: "Semak Tambah Dana",
+    reviewDeposit: "Teruskan",
   },
   zh: {
-    walletAccount: "MooGold 钱包",
-    amountPrompt: "您想添加多少资金？",
+    amountPrompt: "输入金额",
     maxExceeded: "已超过最高存款金额",
     exchangeRateUnavailable: "汇率暂不可用，请重试。",
-    paymentMethod: "付款方式",
+    paymentMethod: "Deposit method",
     creditDebitCard: "信用卡 / 借记卡",
     cardProviders: "Visa、Mastercard 等",
-    paymentReference: "付款参考编号",
+    paymentReference: "Note",
     optional: "选填",
-    referencePlaceholder: "如有参考编号，请在此输入",
+    referencePlaceholder: "添加备注",
     back: "返回",
     preparing: "正在准备...",
-    reviewDeposit: "检查存款",
+    reviewDeposit: "继续",
   },
 };
 
@@ -163,6 +157,7 @@ export default function DepositForm({
   language,
 }: DepositFormProps) {
   const labels = LABELS[language] ?? LABELS.en;
+  const minimumTopUp = getMinimumTopUpAmount(countryCode) ?? 0;
 
   const [state, formAction, isPending] = useActionState(
     depositAction,
@@ -234,45 +229,46 @@ export default function DepositForm({
 
   const maxExceeded =
     usdAmount !== null && usdAmount > MAX_DEPOSIT_USD;
+  const minimumNotMet =
+    numericAmount > 0 && numericAmount < minimumTopUp;
 
   function handleAmountChange(value: string) {
     setAmount(formatAmountInput(value));
   }
 
   return (
-    <form action={formAction} className="space-y-3.5">
+    <form action={formAction} className="mx-auto w-full max-w-sm space-y-5 pb-8">
       <input type="hidden" name="countryCode" value={countryCode} />
+      <input type="hidden" name="bankName" value="Credit / Debit Card" />
 
-      {/* Account */}
-      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-          {labels.walletAccount}
-        </p>
+      {/* Back Button and Heading */}
+      <div className="space-y-3 px-0.5">
+        <div>
+          <a
+            href="/dashboard/wallet"
+            className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 transition hover:bg-slate-200"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>{labels.back}</span>
+          </a>
+        </div>
 
-        <p className="mt-0.5 text-sm font-black text-slate-900">
-          {accountName}
-        </p>
+        <h1 className="text-base font-bold tracking-tight text-slate-900">
+          Add funds to your MooGold wallet
+        </h1>
       </div>
+{/* Heading */}
 
-      {/* Amount */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <label
-          htmlFor="amount"
-          className="block text-sm font-bold text-slate-900"
-        >
-          {labels.amountPrompt}
-        </label>
+      {/* Central Bold Amount Input Section */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm text-center space-y-1">
+        <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
+          {labels.amountPrompt} ({currency})
+        </p>
 
-        <div
-          className={`mt-2.5 flex items-center rounded-xl border bg-slate-50 px-3.5 transition focus-within:bg-white focus-within:ring-4 ${
-            maxExceeded
-              ? "border-red-300 focus-within:border-red-500 focus-within:ring-red-500/10"
-              : "border-slate-300 focus-within:border-emerald-500 focus-within:ring-emerald-500/10"
-          }`}
-        >
+        <div className="flex items-center justify-center gap-0 px-1">
           <span
-            className={`shrink-0 text-lg font-black ${
-              maxExceeded ? "text-red-500" : "text-slate-500"
+            className={`text-3xl font-black tracking-tight ${
+              maxExceeded ? "text-red-500" : "text-slate-950"
             }`}
           >
             {currencySymbol}
@@ -287,23 +283,24 @@ export default function DepositForm({
             onChange={(event) => handleAmountChange(event.target.value)}
             placeholder="0.00"
             autoComplete="off"
+    style={{ width: `${Math.min(12, Math.max(4, (amount || "0.00").length))}ch` }}
             required
-            aria-invalid={maxExceeded}
-            className="w-full min-w-0 bg-transparent px-2.5 py-3 text-2xl font-black text-slate-950 outline-none placeholder:text-slate-300"
-          />
-
-          <span
-            className={`shrink-0 text-xs font-black uppercase tracking-wide ${
-              maxExceeded ? "text-red-500" : "text-slate-400"
+            aria-invalid={maxExceeded || minimumNotMet}
+            className={` min-w-0 w-auto  bg-transparent text-left text-3xl font-black tracking-tight outline-none placeholder:text-slate-200 ${
+              maxExceeded ? "text-red-500" : "text-slate-950"
             }`}
-          >
-            {currency}
-          </span>
+          />
         </div>
 
         {maxExceeded ? (
-          <p role="alert" className="mt-2 text-xs font-bold text-red-600">
+          <p role="alert" className="text-xs font-bold text-red-600 pt-1">
             {labels.maxExceeded}
+          </p>
+        ) : null}
+
+        {!maxExceeded && minimumNotMet ? (
+          <p role="alert" className="text-xs font-bold text-red-600 pt-1">
+            The minimum top up amount is {currencySymbol}{minimumTopUp.toLocaleString("en-US")}.
           </p>
         ) : null}
 
@@ -311,75 +308,53 @@ export default function DepositForm({
         exchangeRate !== null &&
         numericAmount > 0 &&
         currency !== "USD" ? (
-          <p className="mt-2 text-[11px] font-medium text-slate-400">
+          <p className="text-[11px] font-semibold text-slate-400 pt-0.5">
             ≈ ${usdAmount?.toFixed(2)} USD
           </p>
         ) : null}
 
         {rateError ? (
-          <p className="mt-2 text-[11px] font-medium text-amber-600">
+          <p className="text-[11px] font-semibold text-amber-600 pt-0.5">
             {labels.exchangeRateUnavailable}
           </p>
         ) : null}
       </div>
 
-      {/* Payment method */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p className="text-sm font-bold text-slate-900">
+      {/* Deposit Method Section */}
+      <div className="space-y-2">
+        <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 px-1">
           {labels.paymentMethod}
-        </p>
+        </h3>
 
-        <input
-          type="hidden"
-          name="bankName"
-          value="Credit / Debit Card"
-        />
-
-        <div className="mt-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-50/40 px-3.5 py-3">
+        <div className="flex items-center justify-between rounded-2xl border-2 border-emerald-600 bg-emerald-50/20 p-3.5 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
-              <CreditCard className="h-5 w-5 text-emerald-600" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm">
+              <CreditCard className="h-4 w-4 text-emerald-400" />
             </div>
-
             <div>
-              <p className="text-sm font-black text-slate-900">
+              <p className="text-xs font-black text-slate-900">
                 {labels.creditDebitCard}
               </p>
-
-              <p className="mt-0.5 text-xs font-medium text-slate-500">
+              <p className="text-[10px] font-medium text-slate-500">
                 {labels.cardProviders}
               </p>
             </div>
           </div>
 
-          <div className="mt-3 flex items-center gap-2">
-            <span className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[9px] font-black italic text-blue-700 shadow-sm">
-              VISA
-            </span>
-
-            <span className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[8px] font-black text-red-600 shadow-sm">
-              MC
-            </span>
-
-            <span className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[9px] font-black text-slate-700 shadow-sm">
-              AMEX
-            </span>
-
-            <span className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[9px] font-black text-slate-700 shadow-sm">
-              JCB
-            </span>
+          <div className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-emerald-600 bg-emerald-600 text-white">
+            <div className="h-1.5 w-1.5 rounded-full bg-white" />
           </div>
         </div>
       </div>
 
-      {/* Payment reference */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      {/* Note Optional */}
+      <div className="space-y-1.5">
         <label
           htmlFor="externalReference"
-          className="block text-sm font-bold text-slate-900"
+          className="block text-xs font-bold text-slate-700 px-1"
         >
-          {labels.paymentReference}
-          <span className="ml-1 font-medium text-slate-400">
+          {labels.paymentReference}{" "}
+          <span className="font-normal text-slate-400">
             ({labels.optional})
           </span>
         </label>
@@ -390,29 +365,21 @@ export default function DepositForm({
           type="text"
           maxLength={100}
           placeholder={labels.referencePlaceholder}
-          className="mt-2.5 w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-3 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs font-medium text-slate-900 outline-none shadow-sm transition placeholder:text-slate-300 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
         />
       </div>
 
       {state.error ? (
         <div
           role="alert"
-          className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+          className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-700"
         >
           {state.error}
         </div>
       ) : null}
 
-      {/* Actions */}
-      <div className="flex flex-col-reverse gap-2.5 pt-0.5 sm:flex-row">
-        <a
-          href="/dashboard/wallet"
-          className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          {labels.back}
-        </a>
-
+      {/* Bottom Action Button */}
+      <div className="pt-2">
         <button
           type="submit"
           disabled={
@@ -421,11 +388,9 @@ export default function DepositForm({
             rateError ||
             exchangeRate === null
           }
-          className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#126344] py-3.5 text-xs font-black uppercase tracking-wider text-white shadow-md transition hover:bg-[#0a3829] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isPending ? labels.preparing : labels.reviewDeposit}
-
-          {!isPending ? <ArrowRight className="h-4 w-4" /> : null}
+          <span>{isPending ? labels.preparing : labels.reviewDeposit}</span>
         </button>
       </div>
     </form>

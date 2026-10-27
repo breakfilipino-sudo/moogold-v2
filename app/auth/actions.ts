@@ -1,6 +1,6 @@
 "use server";
 
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
@@ -14,6 +14,7 @@ import { prisma } from "@/lib/prisma";
 import { provisionUser } from "@/lib/auth/provision-user";
 import {
   normalizePhone,
+  isPlausibleMobilePhone,
   getPhoneValidationMessage,
   type SupportedCountry,
 } from "@/lib/phone";
@@ -27,6 +28,7 @@ type ActionResult = {
   success?: boolean;
   error?: string;
   phone?: string;
+  email?: string;
   countryCode?: SupportedCountry;
   redirectTo?: string;
   requiresOtp?: boolean;
@@ -91,342 +93,465 @@ function getSupabaseLoginCredential(
  * ============================================================
  */
 
+type PendingRegistration = {
+  email: string;
+  phone: string;
+  countryCode: SupportedCountry;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  dateOfBirth: string;
+  issuedAt: number;
+};
+
+const REGISTRATION_PENDING_COOKIE = "moogold-registration-pending";
+const REGISTRATION_PENDING_TTL_SECONDS = 15 * 60;
+
+function signPendingRegistration(encodedPayload: string, secret: string) {
+  return createHmac("sha256", secret)
+    .update(encodedPayload)
+    .digest("base64url");
+}
+
+function readPendingRegistration(
+  cookieValue: string | undefined,
+  secret: string,
+): PendingRegistration | null {
+  if (!cookieValue) return null;
+
+  const parts = cookieValue.split(".");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
+
+  const [encodedPayload, suppliedSignature] = parts;
+  const expectedSignature = signPendingRegistration(encodedPayload, secret);
+  const expectedBytes = Buffer.from(expectedSignature, "base64url");
+  const suppliedBytes = Buffer.from(suppliedSignature, "base64url");
+
+  if (
+    expectedBytes.length !== suppliedBytes.length ||
+    !timingSafeEqual(expectedBytes, suppliedBytes)
+  ) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(encodedPayload, "base64url").toString("utf8"),
+    ) as Partial<PendingRegistration>;
+
+    const now = Date.now();
+    if (
+      typeof parsed.email !== "string" ||
+      typeof parsed.phone !== "string" ||
+      typeof parsed.countryCode !== "string" ||
+      typeof parsed.firstName !== "string" ||
+      typeof parsed.lastName !== "string" ||
+      typeof parsed.fullName !== "string" ||
+      typeof parsed.dateOfBirth !== "string" ||
+      typeof parsed.issuedAt !== "number" ||
+      parsed.issuedAt > now + 60_000 ||
+      now - parsed.issuedAt > REGISTRATION_PENDING_TTL_SECONDS * 1000
+    ) {
+      return null;
+    }
+
+    return parsed as PendingRegistration;
+  } catch {
+    return null;
+  }
+}
+type VerifiedRegistration = {
+  authUserId: string;
+  email: string;
+  phone: string;
+  countryCode: SupportedCountry;
+  issuedAt: number;
+};
+
+const VERIFIED_REGISTRATION_COOKIE = "moogold-registration-verified";
+const VERIFIED_REGISTRATION_TTL_SECONDS = 15 * 60;
+
+function readVerifiedRegistration(
+  cookieValue: string | undefined,
+  secret: string,
+): VerifiedRegistration | null {
+  if (!cookieValue) return null;
+
+  const parts = cookieValue.split(".");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
+
+  const [encodedPayload, suppliedSignature] = parts;
+  const expectedSignature = signPendingRegistration(encodedPayload, secret);
+  const expectedBytes = Buffer.from(expectedSignature, "base64url");
+  const suppliedBytes = Buffer.from(suppliedSignature, "base64url");
+
+  if (
+    expectedBytes.length !== suppliedBytes.length ||
+    !timingSafeEqual(expectedBytes, suppliedBytes)
+  ) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(encodedPayload, "base64url").toString("utf8"),
+    ) as Partial<VerifiedRegistration>;
+
+    const now = Date.now();
+
+    if (
+      typeof parsed.authUserId !== "string" ||
+      !parsed.authUserId ||
+      typeof parsed.email !== "string" ||
+      typeof parsed.phone !== "string" ||
+      typeof parsed.countryCode !== "string" ||
+      typeof parsed.issuedAt !== "number" ||
+      parsed.issuedAt > now + 60_000 ||
+      now - parsed.issuedAt > VERIFIED_REGISTRATION_TTL_SECONDS * 1000
+    ) {
+      return null;
+    }
+
+    return parsed as VerifiedRegistration;
+  } catch {
+    return null;
+  }
+}
+
 export async function requestRegistrationOtp(
   formData: FormData,
 ): Promise<ActionResult> {
   const supabase = await createClient();
 
-  const fullName =
-    getString(formData, "fullName");
-
-  const dateOfBirth =
-    getString(formData, "dateOfBirth");
-
-  const phoneInput =
-    getString(formData, "phone");
-
-  const countryInput =
-    getString(formData, "countryCode")
-      .toUpperCase();
-
-  const countryCode =
-    countryInput as SupportedCountry;
-
-  if (!fullName || fullName.length < 2) {
-    return {
-      error:
-        "Please enter your full legal name.",
-    };
-  }
-
-  if (!dateOfBirth) {
-    return {
-      error:
-        "Please enter your date of birth.",
-    };
-  }
-
-  const dob = new Date(
-    `${dateOfBirth}T00:00:00.000Z`,
-  );
+  const firstName = getString(formData, "firstName").trim();
+  const lastName = getString(formData, "lastName").trim();
+  const fullName = [firstName, lastName].filter(Boolean).join(" ");
+  const dateOfBirth = getString(formData, "dateOfBirth");
+  const email = getString(formData, "email").trim().toLowerCase();
+  const phoneInput = getString(formData, "phone");
+  const countryInput = getString(formData, "countryCode").toUpperCase();
+  const countryCode = countryInput as SupportedCountry;
 
   if (
+    !firstName ||
+    !lastName ||
+    firstName.length > 80 ||
+    lastName.length > 80 ||
+    fullName.length < 2
+  ) {
+    return { error: "Please enter your first and last name." };
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "Please enter a valid email address." };
+  }
+
+  const dob = new Date(`${dateOfBirth}T00:00:00.000Z`);
+  if (
+    !dateOfBirth ||
     Number.isNaN(dob.getTime()) ||
-    dob > new Date()
+    dob > new Date() ||
+    dob.toISOString().slice(0, 10) !== dateOfBirth
   ) {
-    return {
-      error:
-        "Please enter a valid date of birth.",
-    };
+    return { error: "Please enter a valid date of birth." };
   }
 
-  if (!phoneInput) {
-    return {
-      error:
-        "Please enter your mobile number.",
-    };
+  const supportedCountries = [
+    "US", "PH", "SG", "MY", "KE", "GH", "NG", "ZA",
+    "GB", "CA", "IN", "CN", "AE", "BR", "VN", "TR",
+  ];
+
+  if (!phoneInput || !supportedCountries.includes(countryCode)) {
+    return { error: "Please enter a valid mobile number and select your country." };
   }
 
+  const phoneResult = normalizePhone(phoneInput, countryCode);
   if (
-    !countryInput ||
-    ![
-      "US",
-      "PH",
-      "SG",
-      "MY",
-      "KE",
-      "GH",
-      "NG",
-      "ZA",
-      "GB",
-      "CA",
-      "IN",
-      "CN",
-      "AE",
-      "BR",
-      "VN",
-      "TR",
-    ].includes(countryCode)
+    !phoneResult ||
+    phoneResult.countryCode !== countryCode ||
+    !isPlausibleMobilePhone(phoneResult.phone, countryCode)
   ) {
+    return { error: getPhoneValidationMessage(countryCode) };
+  }
+
+  const phone = phoneResult.phone;
+
+  const existingPhone = await prisma.user.findFirst({
+    where: { phone },
+    select: { id: true },
+  });
+
+  if (existingPhone) {
     return {
-      error:
-        "Please select your country.",
+      error: "An account with this mobile number already exists. Please sign in instead.",
     };
   }
 
-  const phoneResult =
-    normalizePhone(
-      phoneInput,
-      countryCode,
-    );
+  const existingEmail = await prisma.user.findFirst({
+    where: { email },
+    select: { id: true },
+  });
 
-  if (!phoneResult) {
+  if (existingEmail) {
     return {
-      error:
-        getPhoneValidationMessage(
-          countryCode,
-        ),
+      error: "An account with this email address already exists. Please sign in instead.",
     };
   }
 
-  const { phone } =
-    phoneResult;
+  const registrationSecret = process.env.MOOGOLD_AUTH_SECRET;
+  if (!registrationSecret) {
+    console.error("MOOGOLD_AUTH_SECRET is not configured.");
+    return { error: "Registration is temporarily unavailable. Please try again later." };
+  }
 
-  const existingUser =
-    await prisma.user.findFirst({
-      where: {
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      shouldCreateUser: true,
+      data: {
+        fullName,
+        firstName,
+        middleName: null,
+        lastName,
+        email,
         phone,
+        countryCode,
+        dateOfBirth,
       },
-      select: {
-        id: true,
-      },
-    });
-
-  if (existingUser) {
-    return {
-      error:
-        "An account with this mobile number already exists. Please sign in instead.",
-    };
-  }
-
-  const { error } =
-    await supabase.auth.signInWithOtp({
-      phone,
-      options: {
-        shouldCreateUser: true,
-        data: {
-          fullName,
-          firstName:
-            fullName.split(/\s+/)[0] ??
-            fullName,
-          middleName: null,
-          lastName: null,
-          email: null,
-          phone,
-          countryCode,
-          dateOfBirth,
-        },
-      },
-    });
+    },
+  });
 
   if (error) {
-    console.error(
-      "Registration OTP error:",
-      {
-        message: error.message,
-        status: error.status,
-        code: error.code,
-      },
-    );
-
+    console.error("Registration email OTP error:", {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+    });
     return {
-      error:
-        "We could not send the verification code. Please check your mobile number and try again.",
+      error: "We could not send the verification email. Please check your email address and try again.",
     };
   }
 
-  return {
-    success: true,
+  const pendingRegistration: PendingRegistration = {
+    email,
     phone,
     countryCode,
+    firstName,
+    lastName,
+    fullName,
+    dateOfBirth,
+    issuedAt: Date.now(),
   };
+  const encodedPayload = Buffer.from(
+    JSON.stringify(pendingRegistration),
+    "utf8",
+  ).toString("base64url");
+  const signature = signPendingRegistration(encodedPayload, registrationSecret);
+  const cookieStore = await cookies();
+
+  cookieStore.set(
+    REGISTRATION_PENDING_COOKIE,
+    `${encodedPayload}.${signature}`,
+    {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/register",
+      maxAge: REGISTRATION_PENDING_TTL_SECONDS,
+    },
+  );
+
+  return { success: true, phone, email, countryCode };
 }
 
 export async function resendRegistrationOtp(
   formData: FormData,
 ): Promise<ActionResult> {
   const supabase = await createClient();
+  const email = getString(formData, "email").trim().toLowerCase();
 
-  const phoneInput =
-    getString(formData, "phone");
-
-  const countryInput =
-    getString(formData, "countryCode")
-      .toUpperCase();
-
-  const countryCode =
-    countryInput as SupportedCountry;
-
-  if (!phoneInput) {
-    return {
-      error:
-        "Your phone number is missing.",
-    };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "Your email address is missing or invalid." };
   }
 
-  const phoneResult =
-    normalizePhone(
-      phoneInput,
-      countryCode,
-    );
-
-  if (!phoneResult) {
-    return {
-      error:
-        getPhoneValidationMessage(
-          countryCode,
-        ),
-    };
+  const registrationSecret = process.env.MOOGOLD_AUTH_SECRET;
+  if (!registrationSecret) {
+    console.error("MOOGOLD_AUTH_SECRET is not configured.");
+    return { error: "Registration is temporarily unavailable. Please try again later." };
   }
 
-  const { error } =
-    await supabase.auth.signInWithOtp({
-      phone: phoneResult.phone,
-      options: {
-        shouldCreateUser: false,
-      },
-    });
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: false },
+  });
 
   if (error) {
-    console.error(
-      "Registration OTP resend error:",
-      error,
-    );
-
-    return {
-      error:
-        "We could not send the verification code. Please try again.",
-    };
+    console.error("Registration email OTP resend error:", {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+    });
+    return { error: "We could not send the verification email. Please try again." };
   }
 
-  return {
-    success: true,
-    phone: phoneResult.phone,
-    countryCode:
-      phoneResult.countryCode,
-  };
+  return { success: true, email };
 }
 
 export async function verifyRegistrationOtp(
   formData: FormData,
 ): Promise<ActionResult> {
   const supabase = await createClient();
+  const email = getString(formData, "email").trim().toLowerCase();
+  const phone = getString(formData, "phone");
+  const token = getString(formData, "token");
 
-  const phone =
-    getString(formData, "phone");
-
-  const token =
-    getString(formData, "token");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "Your email address is missing or invalid." };
+  }
 
   if (!phone) {
-    return {
-      error:
-        "Your phone number is missing.",
-    };
+    return { error: "Your mobile number is missing." };
   }
 
   if (!/^\d{6}$/.test(token)) {
-    return {
-      error:
-        "Please enter the 6-digit verification code.",
-    };
+    return { error: "Please enter the 6-digit verification code." };
   }
 
-  const phoneResult =
-    normalizePhone(phone);
-
-  if (!phoneResult) {
-    return {
-      error:
-        "Please enter a valid mobile number.",
-    };
-  }
-
-  const {
-    data,
-    error,
-  } = await supabase.auth.verifyOtp({
-    phone: phoneResult.phone,
+  const { data, error } = await supabase.auth.verifyOtp({
+    email,
     token,
-    type: "sms",
+    type: "email",
   });
 
   if (error || !data.user) {
-    console.error(
-      "Registration OTP verification error:",
-      error,
-    );
+    console.error("Registration email OTP verification error:", {
+      message: error?.message,
+      status: error?.status,
+      code: error?.code,
+    });
+    return { error: "The verification code is invalid or has expired." };
+  }
 
+  const verifiedEmail = (data.user.email ?? "").trim().toLowerCase();
+
+  if (!verifiedEmail || verifiedEmail !== email) {
+    return { error: "The verified email does not match this registration. Please start again." };
+  }
+
+  const registrationSecret = process.env.MOOGOLD_AUTH_SECRET;
+  const pendingCookieStore = await cookies();
+  const pending = registrationSecret
+    ? readPendingRegistration(
+        pendingCookieStore.get(REGISTRATION_PENDING_COOKIE)?.value,
+        registrationSecret,
+      )
+    : null;
+
+  if (!pending || pending.email !== verifiedEmail) {
     return {
-      error:
-        "The verification code is invalid or has expired.",
+      error: "Your registration session has expired. Please start registration again and request a new code.",
     };
   }
 
-  const metadata =
-    data.user.user_metadata ?? {};
+  const requestedPhone = normalizePhone(phone, pending.countryCode);
+  const savedPhone = normalizePhone(pending.phone, pending.countryCode);
 
-  const fullName =
-    typeof metadata.fullName === "string"
-      ? metadata.fullName.trim()
-      : "";
+  console.error("Registration phone validation diagnostic:", {
+    requestedPhoneValid: Boolean(requestedPhone),
+    savedPhoneValid: Boolean(savedPhone),
+    phoneMatches: Boolean(
+      requestedPhone &&
+      savedPhone &&
+      requestedPhone.phone === savedPhone.phone,
+    ),
+    savedPhoneCanonical: Boolean(
+      savedPhone && savedPhone.phone === pending.phone,
+    ),
+    savedPhonePlausible: Boolean(
+      savedPhone &&
+      isPlausibleMobilePhone(savedPhone.phone, pending.countryCode),
+    ),
+  });
 
-  const email =
-    typeof metadata.email === "string"
-      ? metadata.email.trim().toLowerCase()
-      : null;
+  if (
+    !requestedPhone ||
+    !savedPhone ||
+    requestedPhone.phone !== savedPhone.phone ||
+    savedPhone.phone !== pending.phone ||
+    !isPlausibleMobilePhone(savedPhone.phone, pending.countryCode)
+  ) {
+    return {
+      error: "Your registration details could not be confirmed. Please start registration again.",
+    };
+  }
 
-  const countryValue =
-    typeof metadata.countryCode === "string"
-      ? metadata.countryCode.toUpperCase()
-      : phoneResult.countryCode;
+  const countryValue = pending.countryCode;
+  const fullName = pending.fullName;
+  const verifiedPhone = pending.phone;
+  const dateOfBirth = pending.dateOfBirth || null;
+  const cookieStore = await cookies();
+  const savedLanguage = cookieStore.get("moogold-language")?.value;
 
-      const cookieStore = await cookies();
-const savedLanguage =
-  cookieStore.get("moogold-language")?.value;
+  const requestedLanguage: LanguageCode =
+    savedLanguage === "fil" ||
+    savedLanguage === "ms" ||
+    savedLanguage === "zh" ||
+    savedLanguage === "en"
+      ? savedLanguage
+      : "en";
 
-const requestedLanguage: LanguageCode =
-  savedLanguage === "fil" ||
-  savedLanguage === "ms" ||
-  savedLanguage === "zh" ||
-  savedLanguage === "en"
-    ? savedLanguage
-    : "en";
-
-const preferredLanguage = getSupportedLanguage(
-  requestedLanguage,
-  countryValue,
-);
-
-  const dateOfBirth =
-    typeof metadata.dateOfBirth === "string"
-      ? metadata.dateOfBirth
-      : null;
+  getSupportedLanguage(requestedLanguage, countryValue);
 
   await provisionUser({
     authUserId: data.user.id,
-    email,
-    phone: phoneResult.phone,
+    email: verifiedEmail,
+    phone: verifiedPhone,
     countryCode: countryValue,
     fullName,
     dateOfBirth,
   });
 
+  const verifiedRegistration: VerifiedRegistration = {
+    authUserId: data.user.id,
+    email: verifiedEmail,
+    phone: verifiedPhone,
+    countryCode: countryValue,
+    issuedAt: Date.now(),
+  };
+  const verifiedPayload = Buffer.from(
+    JSON.stringify(verifiedRegistration),
+    "utf8",
+  ).toString("base64url");
+  const verifiedSignature = signPendingRegistration(
+    verifiedPayload,
+    registrationSecret!,
+  );
+
+  pendingCookieStore.set(
+    VERIFIED_REGISTRATION_COOKIE,
+    `${verifiedPayload}.${verifiedSignature}`,
+    {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/register",
+      maxAge: VERIFIED_REGISTRATION_TTL_SECONDS,
+    },
+  );
+
+  pendingCookieStore.set(REGISTRATION_PENDING_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/register",
+    maxAge: 0,
+  });
+
   return {
     success: true,
-    phone: phoneResult.phone,
-    countryCode:
-      phoneResult.countryCode,
+    phone: verifiedPhone,
+    email: verifiedEmail,
+    countryCode: countryValue,
   };
 }
 
@@ -461,14 +586,43 @@ export async function createPin(
     };
   }
 
-  const {
-    data: {
-      user: authUser,
-    },
-  } = await supabase.auth.getUser();
+  const registrationSecret = process.env.MOOGOLD_AUTH_SECRET;
+  const cookieStore = await cookies();
+  const verifiedRegistration =
+    registrationSecret
+      ? readVerifiedRegistration(
+          cookieStore.get(VERIFIED_REGISTRATION_COOKIE)?.value,
+          registrationSecret,
+        )
+      : null;
 
-  if (!authUser) {
+  if (!verifiedRegistration) {
     redirect("/register");
+  }
+
+  const admin = createAdminClient();
+  const {
+    data: { user: authUser },
+    error: authUserError,
+  } = await admin.auth.admin.getUserById(
+    verifiedRegistration.authUserId,
+  );
+
+  const verifiedAuthEmail = (authUser?.email ?? "").trim().toLowerCase();
+
+  if (
+    authUserError ||
+    !authUser ||
+    !verifiedAuthEmail ||
+    verifiedAuthEmail !== verifiedRegistration.email
+  ) {
+    console.error(
+      "Verified registration account lookup failed:",
+      authUserError?.message ?? "The account identity could not be verified.",
+    );
+    return {
+      error: "We could not verify your registration. Please start again.",
+    };
   }
 
   const user =
@@ -476,15 +630,23 @@ export async function createPin(
       where: {
         authUserId: authUser.id,
       },
-      select: {
-        id: true,
-      },
+      select: { id: true, fullName: true, phone: true, countryCode: true },
     });
 
   if (!user) {
     return {
-      error:
-        "We could not find your registration. Please start again.",
+      error: "We could not find your registration. Please start again.",
+    };
+  }
+
+  if (
+    !user.phone ||
+    !user.countryCode ||
+    user.phone !== verifiedRegistration.phone ||
+    user.countryCode !== verifiedRegistration.countryCode
+  ) {
+    return {
+      error: "Your registration details are incomplete or do not match. Please start again.",
     };
   }
 
@@ -505,9 +667,6 @@ export async function createPin(
    * Establish the internal Supabase password now.
    * This is never shown to the customer.
    */
-  const admin =
-    createAdminClient();
-
   const credential =
     getSupabaseLoginCredential(
       authUser.id,
@@ -536,8 +695,45 @@ export async function createPin(
     };
   }
 
+  // Establish a fresh customer session after the admin password update.
+  const {
+    data: sessionData,
+    error: sessionError,
+  } = await supabase.auth.signInWithPassword({
+    email: verifiedRegistration.email,
+    password: credential,
+  });
+
+  if (
+    sessionError ||
+    !sessionData.session ||
+    sessionData.user.id !== authUser.id
+  ) {
+    console.error(
+      "Registration session setup failed:",
+      sessionError?.message ?? "Session or account identity was not verified.",
+    );
+
+    await supabase.auth.signOut();
+    redirect("/login");
+  }
+  cookieStore.set(VERIFIED_REGISTRATION_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/register",
+    maxAge: 0,
+  });
+
+  const firstName = user.fullName?.trim().split(/\s+/)[0] || "there";
+
   return {
     success: true,
+    profile: {
+      firstName,
+      phone: user.phone,
+      countryCode: user.countryCode,
+    },
   };
 }
 
@@ -667,6 +863,7 @@ export async function signInWithPin(
       },
       select: {
         authUserId: true,
+        email: true,
         pinHash: true,
         fullName: true,
         phone: true,
@@ -688,6 +885,13 @@ export async function signInWithPin(
     };
   }
 
+
+  if (!user.email) {
+    return {
+      error:
+        "We could not establish your secure login session. Please contact support.",
+    };
+  }
   if (
     String(user.accountStatus) ===
     "CLOSED"
@@ -767,10 +971,7 @@ export async function signInWithPin(
     data: sessionData,
     error: signInError,
   } =
-    await supabase.auth.signInWithPassword({
-      phone: phoneResult.phone,
-      password: credential,
-    });
+    await supabase.auth.signInWithPassword({ email: user.email, password: credential });
 
   console.log(
     `[login-timing] Supabase signInWithPassword #1: ${Math.round(
@@ -835,10 +1036,7 @@ export async function signInWithPin(
       data: sessionData,
       error: signInError,
     } =
-      await supabase.auth.signInWithPassword({
-        phone: phoneResult.phone,
-        password: credential,
-      }));
+      await supabase.auth.signInWithPassword({ email: user.email, password: credential }));
 
     console.log(
       `[login-timing] Supabase signInWithPassword #2: ${Math.round(
@@ -1325,14 +1523,13 @@ export async function resetPin(
    * Keep the internal Supabase credential synchronized
    * with the new MooGold PIN.
    */
-  const admin =
-    createAdminClient();
-
   const credential =
     getSupabaseLoginCredential(
       authUser.id,
       pin,
     );
+
+  const admin = createAdminClient();
 
   const {
     error: passwordError,

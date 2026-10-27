@@ -11,12 +11,12 @@ import { useRouter } from "next/navigation";
 import {
   Eye,
   EyeOff,
-  ArrowRight,
 } from "lucide-react";
 
 import { signInWithPin } from "@/app/auth/actions";
 import AuthShell from "@/components/auth/auth-shell";
 import { translate } from "@/lib/i18n/translations";
+import { getCountryDialCode, type SupportedCountry } from "@/lib/phone";
 
 type Account = {
   firstName: string;
@@ -86,11 +86,14 @@ function getServerSnapshot(): Account | null {
 }
 
 function formatPhone(value: string) {
-  if (value.length <= 7) {
+  const digits = value.replace(/\D/g, "");
+  const localDigits = digits.length > 10 ? digits.slice(-10) : digits;
+
+  if (localDigits.length <= 7) {
     return value;
   }
 
-  return `${value.slice(0, 3)} •••• ${value.slice(-4)}`;
+  return `${localDigits.slice(0, 3)}****${localDigits.slice(-4)}`;
 }
 
 export default function LoginPage() {
@@ -117,6 +120,13 @@ export default function LoginPage() {
     remembered && !another
       ? remembered
       : null;
+
+  const accountCountryCode =
+    (remembered?.countryCode || "NG") as SupportedCountry;
+  const accountDialCode = getCountryDialCode(accountCountryCode);
+  const accountNumberPlaceholder = accountDialCode
+    ? `${t("accountNumberPlaceholder")} (${accountDialCode})`
+    : t("accountNumberPlaceholder");
 
 
   useEffect(() => {
@@ -289,6 +299,28 @@ export default function LoginPage() {
       }
 
       if (result?.success) {
+        const profile = result.profile;
+
+        if (
+          profile?.firstName &&
+          profile.phone &&
+          profile.countryCode
+        ) {
+          const account = {
+            firstName: profile.firstName,
+            phone: profile.phone,
+            countryCode: profile.countryCode,
+          };
+
+          try {
+            localStorage.setItem(KEY, JSON.stringify(account));
+            snapshot = account;
+            window.dispatchEvent(new Event(EVENT));
+          } catch {
+            // Remembering the account is optional.
+          }
+        }
+
         router.replace(result.redirectTo || "/dashboard");
         return;
       }
@@ -325,49 +357,24 @@ export default function LoginPage() {
   return (
     <AuthShell
       step={1}
-      title={
-        active
-          ? `${t("welcomeBack")}, ${active.firstName}`
-          : t("logIn")
-      }
-      description={
-        active
-          ? t("enterPin")
-          : t("loginDescription")
-      }
+      title=""
+      description=""
+      light
+      hideHeading
+      hideStep
     >
       <form onSubmit={submit} className="relative">
         {active ? (
-          <div className="mb-5">
-            <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#87938d]">
-                {t("accountNumber")}
-              </span>
-
-              <button
-                type="button"
-                onClick={switchAccount}
-                className="min-h-8 text-[11px] font-bold text-[#138a5d] transition hover:text-[#0d704c]"
-              >
-                {t("switchAccount")}
-              </button>
-            </div>
-
-            <div className="border-b border-[#dce5df] pb-2.5">
-              <p className="text-[15px] font-semibold tracking-[-0.02em] text-[#17231e]">
-                {formatPhone(active.phone)}
-              </p>
-            </div>
+          <div className="mb-4 text-center">
+            <p className="text-sm font-medium tracking-[0.02em] text-[#718078]">
+              {active.firstName}
+            </p>
+            <p className="mt-1.5 text-sm font-medium tracking-[0.02em] text-[#718078]">
+              {formatPhone(active.phone)}
+            </p>
           </div>
         ) : (
-          <div className="mb-5">
-            <label
-              htmlFor="phone"
-              className="mb-2 block text-[10px] font-bold uppercase tracking-[0.12em] text-[#52605a]"
-            >
-              {t("accountNumber")}
-            </label>
-
+          <div className="mx-auto mb-5 w-full max-w-[360px]">
             <input
               id="phone"
               name="phone"
@@ -380,16 +387,17 @@ export default function LoginPage() {
               required
               inputMode="tel"
               autoComplete="tel"
-              placeholder={t("accountNumberPlaceholder")}
+              placeholder={accountNumberPlaceholder}
+              aria-label={t("accountNumber")}
               className="h-12 w-full border-0 border-b border-[#cfd9d3] bg-transparent px-0 text-[15px] font-medium text-[#17231e] outline-none transition placeholder:text-[#a4ada8] focus:border-[#138a5d]"
             />
           </div>
         )}
 
         <div>
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mx-auto mb-2 flex w-full max-w-[360px] items-center justify-between">
             <label className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#52605a]">
-              {t("pin")} (4 digits)
+              Enter 4-digit PIN
             </label>
 
             <button
@@ -406,7 +414,7 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <div className="grid grid-cols-4 gap-2">
+          <div className="mx-auto grid w-full max-w-[360px] grid-cols-4 gap-4">
             {[0, 1, 2, 3].map((index) => (
               <input
                 key={index}
@@ -423,17 +431,17 @@ export default function LoginPage() {
                 onKeyDown={(event) => handlePinKeyDown(index, event)}
                 onPaste={(event) => handlePinPaste(index, event)}
                 aria-label={`PIN digit ${index + 1}`}
-                className={`h-12 w-full rounded-xl border border-[#d3ddd7] bg-white text-center text-[18px] font-bold text-[#17231e] shadow-[0_3px_10px_rgba(20,45,35,0.04)] outline-none transition focus:border-[#138a5d] focus:shadow-[0_3px_14px_rgba(19,138,93,0.10)] ${
+                className={`h-14 w-full rounded-xl border border-[#d3ddd7] bg-white text-center text-[18px] font-bold text-[#17231e] shadow-[0_3px_10px_rgba(20,45,35,0.04)] outline-none transition focus:border-[#138a5d] focus:shadow-[0_3px_14px_rgba(19,138,93,0.10)] ${
                   showPin ? "" : "[&]:[-webkit-text-security:disc]"
                 }`}
               />
             ))}
           </div>
 
-          <div className="mt-2.5">
+          <div className="mx-auto mt-2.5 flex w-full max-w-[360px] justify-end">
             <Link
               href="/forgot-pin"
-              className="text-[11px] font-semibold text-[#138a5d] transition hover:text-[#0d704c]"
+              className="text-xs font-semibold text-[#138a5d] transition hover:text-[#0d704c]"
             >
               {t("forgotPin")}
             </Link>
@@ -456,7 +464,7 @@ export default function LoginPage() {
             pinString.length !== 4 ||
             (!active && !phone.trim())
           }
-          className="group mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#138a5d] text-[13px] font-bold text-white shadow-[0_7px_17px_rgba(19,138,93,0.17)] transition hover:bg-[#0f7b52] hover:shadow-[0_9px_21px_rgba(19,138,93,0.21)] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+          className="group mx-auto mt-5 flex h-14 w-full max-w-[360px] items-center justify-center gap-2 rounded-xl bg-[#138a5d] text-[13px] font-bold text-white shadow-[0_7px_17px_rgba(19,138,93,0.17)] transition hover:bg-[#0f7b52] hover:shadow-[0_9px_21px_rgba(19,138,93,0.21)] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
         >
           {loading ? (
             <>
@@ -465,20 +473,28 @@ export default function LoginPage() {
             </>
           ) : (
             <>
-              {t("loginContinue")}
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              {t("logIn")}
             </>
           )}
         </button>
 
-        {!remembered && (
-          <div className="mt-5 text-center">
-            <span className="text-[11px] text-[#89958f]">
-              {t("newToMooGold")}
-            </span>{" "}
+        {active && (
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={switchAccount}
+              className="min-h-10 px-3 text-sm font-semibold text-[#65736c] transition hover:text-[#138a5d]"
+            >
+              {t("switchAccount")}
+            </button>
+          </div>
+        )}
+
+        {(!remembered || another) && (
+          <div className="mx-auto mt-2 w-full max-w-[360px] text-center">
             <Link
               href="/register"
-              className="text-[11px] font-bold text-[#138a5d] transition hover:text-[#0d704c]"
+              className="inline-flex min-h-10 items-center justify-center text-sm font-bold text-[#138a5d] transition hover:text-[#0d704c]"
             >
               {t("createAccount")}
             </Link>

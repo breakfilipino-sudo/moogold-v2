@@ -62,6 +62,7 @@ export default function CryptoDepositForm() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const selected = useMemo(
     () =>
@@ -154,8 +155,8 @@ export default function CryptoDepositForm() {
 
   if (submitted) {
     return (
-      <div className="rounded-2xl bg-slate-50 p-5 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+      <div className="rounded-3xl border border-emerald-100 bg-gradient-to-b from-emerald-50/80 via-white to-white p-5 text-center shadow-[0_18px_48px_-32px_rgba(6,95,70,0.45)] sm:p-7">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-700 to-emerald-500 text-white shadow-lg shadow-emerald-900/15">
           <Check className="h-6 w-6" />
         </div>
 
@@ -163,39 +164,39 @@ export default function CryptoDepositForm() {
           Deposit submitted
         </h3>
 
-        <p className="mt-2 text-sm leading-5 text-slate-600">
+        <p className="mt-2 text-base leading-5 text-slate-600">
           Your crypto deposit has been submitted.
           Crypto arrives in your wallet within seconds,
           depending on the network.
         </p>
 
-        <div className="mt-4 rounded-xl bg-white p-4 text-left">
+        <div className="mt-5 space-y-3 rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm sm:p-5">
           <div className="flex justify-between gap-4">
-            <span className="text-sm text-slate-500">
+            <span className="text-base text-slate-500">
               Asset
             </span>
 
-            <span className="text-sm font-semibold text-slate-900">
+            <span className="text-base font-semibold text-slate-900">
               {selected.asset}
             </span>
           </div>
 
           <div className="mt-2 flex justify-between gap-4">
-            <span className="text-sm text-slate-500">
+            <span className="text-base text-slate-500">
               Network
             </span>
 
-            <span className="text-sm font-semibold text-slate-900">
+            <span className="text-base font-semibold text-slate-900">
               {selected.networkLabel}
             </span>
           </div>
 
           <div className="mt-2 flex justify-between gap-4">
-            <span className="text-sm text-slate-500">
+            <span className="text-base text-slate-500">
               Status
             </span>
 
-            <span className="text-sm font-semibold text-amber-600">
+            <span className="text-base font-semibold text-amber-600">
               Processing
             </span>
           </div>
@@ -208,7 +209,7 @@ export default function CryptoDepositForm() {
             setCopied(false);
             setError("");
           }}
-          className="mt-5 text-sm font-semibold text-emerald-600 hover:text-emerald-700"
+          className="mt-5 text-base font-semibold text-emerald-600 hover:text-emerald-700"
         >
           Make another deposit
         </button>
@@ -217,50 +218,124 @@ export default function CryptoDepositForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      {/* How to deposit */}
-      <div className="rounded-xl bg-slate-50 p-4">
-        <p className="text-sm font-bold text-slate-900">
-          How to deposit
-        </p>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Deposit instructions are available on demand. */}
+      <button
+        type="button"
+        onClick={() => setHelpOpen(true)}
+        className="flex w-full items-center justify-between rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50/80 via-white to-amber-50/50 px-4 py-4 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 sm:px-5"
+        aria-haspopup="dialog"
+        aria-label="How to deposit"
+      >
+        <span className="flex items-center gap-3">
 
-        <ol className="mt-3 space-y-2.5">
-          <li className="flex gap-3 text-xs leading-5 text-slate-600">
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-bold text-slate-700">
-              1
+          <span>
+            <span className="block text-base font-semibold text-slate-900">
+              How to deposit
             </span>
-
-            <span>
-              Select the crypto you want to receive/deposit.
+            <span className="mt-0.5 block text-sm text-slate-500">
+              View deposit steps and network safety tips
             </span>
-          </li>
+          </span>
+        </span>
 
-          <li className="flex gap-3 text-xs leading-5 text-slate-600">
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-bold text-slate-700">
-              2
-            </span>
+      </button>
 
-            <span>
-              Copy your MooGold funding address and send
-              the crypto from an external wallet or exchange.
-            </span>
-          </li>
-        </ol>
+      {helpOpen && (
+        <div
+          className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-md sm:items-center sm:p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setHelpOpen(false);
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="crypto-deposit-help-title"
+            className="w-full max-w-lg overflow-hidden rounded-t-[28px] border border-white/70 bg-[#FCFDFC] shadow-[0_24px_90px_-24px_rgba(0,0,0,0.45)] sm:rounded-[24px]"
+          >
+            <div className="flex items-start justify-between border-b border-slate-100 px-5 py-5 sm:px-6">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                  Crypto deposits
+                </p>
+                <h3
+                  id="crypto-deposit-help-title"
+                  className="mt-1 text-xl font-semibold tracking-tight text-slate-950"
+                >
+                  How to deposit
+                </h3>
+                <p className="mt-1 text-base leading-5 text-slate-500">
+                  Follow these steps before sending funds.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHelpOpen(false)}
+                className="ml-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                aria-label="Close deposit instructions"
+              >
+                <span aria-hidden="true" className="text-2xl leading-none">×</span>
+              </button>
+            </div>
 
-        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-          <p className="text-xs font-semibold leading-5 text-amber-900">
-            Make sure the network matches exactly. Sending
-            on the wrong network may result in permanent
-            loss of funds.
-          </p>
+            <div className="space-y-5 px-5 py-5 sm:px-6">
+              <ol className="space-y-4">
+                <li className="flex gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-base font-bold text-emerald-800">
+                    1
+                  </span>
+                  <div>
+                    <p className="text-base font-semibold text-slate-900">
+                      Select your crypto
+                    </p>
+                    <p className="mt-1 text-base leading-6 text-slate-600">
+                      Select the crypto asset and network you want to deposit.
+                    </p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-base font-bold text-emerald-800">
+                    2
+                  </span>
+                  <div>
+                    <p className="text-base font-semibold text-slate-900">
+                      Send to your MooGold address
+                    </p>
+                    <p className="mt-1 text-base leading-6 text-slate-600">
+                      Copy the funding address shown in the form and send crypto from your external wallet or exchange.
+                    </p>
+                  </div>
+                </li>
+              </ol>
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-base font-semibold text-amber-950">
+                  Check the network carefully
+                </p>
+                <p className="mt-1 text-base leading-6 text-amber-900">
+                  Make sure the sending network matches the selected network exactly. Sending on the wrong network may result in permanent loss of funds.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setHelpOpen(false)}
+                className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-base font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+              >
+                Got it
+              </button>
+            </div>
+          </section>
         </div>
-      </div>
-
+      )}
       {/* Asset / Network */}
       <div className="mt-5">
         <label
           htmlFor="crypto-asset"
-          className="text-sm font-semibold text-slate-700"
+          className="text-base font-semibold text-slate-700"
         >
           Asset / Network
         </label>
@@ -273,7 +348,7 @@ export default function CryptoDepositForm() {
             setCopied(false);
             setError("");
           }}
-          className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
+          className="mt-2.5 w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-semibold text-slate-900 shadow-sm outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10"
         >
           {CRYPTO_OPTIONS.map((crypto) => (
             <option
@@ -289,12 +364,12 @@ export default function CryptoDepositForm() {
       {/* Address */}
       <div className="mt-5">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
+          <div className="min-w-0 flex-1">
+            <p className="break-words text-sm font-semibold leading-5 text-slate-900 sm:text-base">
               Your MooGold {selected.asset} funding address
             </p>
 
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-sm text-slate-500">
               {selected.networkLabel}
             </p>
           </div>
@@ -302,7 +377,7 @@ export default function CryptoDepositForm() {
           <button
             type="button"
             onClick={copyAddress}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3.5 py-2.5 text-sm font-bold text-emerald-800 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
           >
             {copied ? (
               <>
@@ -318,23 +393,23 @@ export default function CryptoDepositForm() {
           </button>
         </div>
 
-        <div className="mt-3 rounded-xl bg-slate-50 p-4">
-          <code className="block break-all text-xs leading-5 text-slate-700">
+        <div className="mt-3 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 via-white to-amber-50/40 p-4 shadow-inner sm:p-5">
+          <code className="block break-all font-mono text-sm leading-6 text-slate-800 sm:text-base sm:leading-7">
             {selected.address}
           </code>
         </div>
       </div>
 
       {/* Network speed */}
-      <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-        <p className="text-sm font-semibold leading-5 text-emerald-900">
+      <div className="mt-4 flex gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-white px-4 py-4 shadow-sm">
+        <p className="text-base font-semibold leading-5 text-emerald-900">
           Crypto arrives in your wallet within seconds,
           depending on the network.
         </p>
       </div>
 
       {error && (
-        <div className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium leading-5 text-red-600">
+        <div className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-base font-medium leading-5 text-red-600">
           {error}
         </div>
       )}
@@ -343,7 +418,7 @@ export default function CryptoDepositForm() {
       <button
         type="submit"
         disabled={loading}
-        className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+        className="mt-5 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-600 px-5 py-4 text-base font-bold text-white shadow-lg shadow-emerald-900/15 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-emerald-900/20 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-600/20 disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
       >
         {loading ? (
           <>

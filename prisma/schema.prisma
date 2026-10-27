@@ -30,6 +30,7 @@ model User {
   cryptoBalances               CryptoBalance[]
   cryptoDeposits               CryptoDeposit[]
   cryptoWithdrawals            CryptoWithdrawal[]
+  cryptoDepositBonus           CryptoDepositBonus?
   giftCardReviews              GiftCardSubmission[]          @relation("GiftCardReviewer")
   giftCardSubmissions          GiftCardSubmission[]
   goldHolding                  GoldHolding?
@@ -48,8 +49,16 @@ model User {
   wealthFundings               WealthFunding[]
   wealthSpecialCardSubmissions WealthSpecialCardSubmission[]
   wealthFundingReviews         WealthFunding[]               @relation("WealthFundingReviewer")
-    wealthSpecialCardReviews WealthSpecialCardSubmission[] @relation("WealthSpecialCardReviewer")
+  wealthSpecialCardReviews     WealthSpecialCardSubmission[] @relation("WealthSpecialCardReviewer")
   preferredLanguage            String                        @default("en")
+  walletSpecialCardRequests    WalletSpecialCardRequest[]    @relation("WalletSpecialCardOwner")
+  walletSpecialCardCodesIssued WalletSpecialCardRequest[]    @relation("WalletSpecialCardIssuer")
+  cryptoLoans                  CryptoLoan[]
+  cryptoCashConversions        CryptoCashConversion[]
+  cryptoCashConversionReviews  CryptoCashConversion[]        @relation("CryptoCashConversionReviewer")
+  regularLoanApplications      RegularLoanApplication[]      @relation("RegularLoanApplicant")
+  regularLoanReviews           RegularLoanApplication[]      @relation("RegularLoanReviewer")
+  regularLoanBalance           RegularLoanBalance?
 
   @@index([accountStatus])
 }
@@ -90,29 +99,31 @@ model GoldMarketSnapshot {
 }
 
 model Transaction {
-  id                 String              @id @default(cuid())
-  userId             String
-  type               TransactionType     @default(DEPOSIT)
-  status             TransactionStatus   @default(PENDING)
-  balanceType        BalanceType?
-  amount             Decimal             @db.Decimal(20, 2)
-  currency           String              @default("USD")
-  usdAmount          Decimal?            @db.Decimal(20, 2)
-  exchangeRate       Decimal?            @db.Decimal(20, 8)
-  description        String?
-  reference          String              @unique
-  approvedById       String?
-  approvedAt         DateTime?
-  rejectionReason    String?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  balanceAdjustment  BalanceAdjustment?
-  depositDetails     DepositDetails?
-  giftCardSubmission GiftCardSubmission?
-  approvedBy         User?               @relation("TransactionApprover", fields: [approvedById], references: [id])
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ledgerEntry        WalletLedgerEntry?
-  withdrawalDetails  WithdrawalDetails?
+  id                       String                    @id @default(cuid())
+  userId                   String
+  type                     TransactionType           @default(DEPOSIT)
+  status                   TransactionStatus         @default(PENDING)
+  balanceType              BalanceType?
+  amount                   Decimal                   @db.Decimal(20, 2)
+  currency                 String                    @default("USD")
+  usdAmount                Decimal?                  @db.Decimal(20, 2)
+  exchangeRate             Decimal?                  @db.Decimal(20, 8)
+  description              String?
+  reference                String                    @unique
+  approvedById             String?
+  approvedAt               DateTime?
+  rejectionReason          String?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  balanceAdjustment        BalanceAdjustment?
+  depositDetails           DepositDetails?
+  giftCardSubmission       GiftCardSubmission?
+  approvedBy               User?                     @relation("TransactionApprover", fields: [approvedById], references: [id])
+  user                     User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledgerEntry              WalletLedgerEntry?
+  withdrawalDetails        WithdrawalDetails?
+  cashConversion           CryptoCashConversion?
+  walletSpecialCardRequest WalletSpecialCardRequest?
 
   @@index([userId])
   @@index([status])
@@ -225,17 +236,22 @@ model Referral {
 }
 
 model CryptoBalance {
-  id            String              @id @default(cuid())
-  userId        String
-  asset         CryptoAsset
-  network       CryptoNetwork
-  balance       Decimal             @default(0) @db.Decimal(30, 18)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deposits      CryptoDeposit[]
-  ledgerEntries CryptoLedgerEntry[]
-  withdrawals   CryptoWithdrawal[]
+  id              String                 @id @default(cuid())
+  userId          String
+  asset           CryptoAsset
+  network         CryptoNetwork
+  balance         Decimal                @default(0) @db.Decimal(30, 18)
+  reservedBalance Decimal                @default(0) @db.Decimal(30, 18)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deposits        CryptoDeposit[]
+  ledgerEntries   CryptoLedgerEntry[]
+  withdrawals     CryptoWithdrawal[]
+  depositBonuses  CryptoDepositBonus[]
+  collateralLoans CryptoLoan[]           @relation("CryptoLoanCollateralBalance")
+  borrowedLoans   CryptoLoan[]           @relation("CryptoLoanBorrowedBalance")
+  cashConversions CryptoCashConversion[]
 
   @@unique([userId, asset, network])
   @@index([userId])
@@ -244,30 +260,31 @@ model CryptoBalance {
 }
 
 model CryptoDeposit {
-  id               String              @id @default(cuid())
-  userId           String
-  cryptoBalanceId  String
-  asset            CryptoAsset
-  network          CryptoNetwork
-  amount           Decimal?            @db.Decimal(30, 18)
-  usdAmount        Decimal?            @db.Decimal(20, 2)
-  exchangeRate     Decimal?            @db.Decimal(20, 8)
-  receivingAddress String
-  transactionHash  String?
-  senderAddress    String?
-  blockNumber      String?
-  confirmations    Int?
-  status           CryptoDepositStatus @default(PENDING)
-  description      String?
-  rejectionReason  String?
-  reviewedById     String?
-  reviewedAt       DateTime?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  cryptoBalance    CryptoBalance       @relation(fields: [cryptoBalanceId], references: [id])
-  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ledgerEntry      CryptoLedgerEntry?
-  wealthFunding    WealthFunding?
+  id                 String              @id @default(cuid())
+  userId             String
+  cryptoBalanceId    String
+  asset              CryptoAsset
+  network            CryptoNetwork
+  amount             Decimal?            @db.Decimal(30, 18)
+  usdAmount          Decimal?            @db.Decimal(20, 2)
+  exchangeRate       Decimal?            @db.Decimal(20, 8)
+  receivingAddress   String
+  transactionHash    String?
+  senderAddress      String?
+  blockNumber        String?
+  confirmations      Int?
+  status             CryptoDepositStatus @default(PENDING)
+  description        String?
+  rejectionReason    String?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  cryptoBalance      CryptoBalance       @relation(fields: [cryptoBalanceId], references: [id])
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledgerEntry        CryptoLedgerEntry?
+  wealthFunding      WealthFunding?
+  cryptoDepositBonus CryptoDepositBonus?
 
   @@index([userId])
   @@index([cryptoBalanceId])
@@ -275,6 +292,26 @@ model CryptoDeposit {
   @@index([asset])
   @@index([network])
   @@index([transactionHash])
+  @@index([createdAt])
+}
+
+model CryptoDepositBonus {
+  id                  String        @id @default(cuid())
+  userId              String        @unique
+  qualifyingDepositId String        @unique
+  cryptoBalanceId     String
+  asset               CryptoAsset
+  network             CryptoNetwork
+  amount              Decimal       @db.Decimal(30, 18)
+  usdValue            Decimal       @db.Decimal(20, 2)
+  exchangeRate        Decimal       @db.Decimal(20, 8)
+  createdAt           DateTime      @default(now())
+
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  qualifyingDeposit CryptoDeposit @relation(fields: [qualifyingDepositId], references: [id], onDelete: Restrict)
+  cryptoBalance     CryptoBalance @relation(fields: [cryptoBalanceId], references: [id], onDelete: Restrict)
+
+  @@index([cryptoBalanceId])
   @@index([createdAt])
 }
 
@@ -314,27 +351,44 @@ model CryptoWithdrawal {
 }
 
 model CryptoLedgerEntry {
-  id              String            @id @default(cuid())
-  cryptoBalanceId String
-  depositId       String?           @unique
-  asset           CryptoAsset
-  network         CryptoNetwork
-  direction       LedgerDirection
-  amount          Decimal           @db.Decimal(30, 18)
-  balanceBefore   Decimal           @db.Decimal(30, 18)
-  balanceAfter    Decimal           @db.Decimal(30, 18)
-  description     String?
-  createdAt       DateTime          @default(now())
-  withdrawalId    String?           @unique
-  cryptoBalance   CryptoBalance     @relation(fields: [cryptoBalanceId], references: [id], onDelete: Cascade)
-  deposit         CryptoDeposit?    @relation(fields: [depositId], references: [id], onDelete: Restrict)
-  withdrawal      CryptoWithdrawal? @relation(fields: [withdrawalId], references: [id], onDelete: Restrict)
+  id                    String          @id @default(cuid())
+  cryptoBalanceId       String
+  depositId             String?         @unique
+  asset                 CryptoAsset
+  network               CryptoNetwork
+  direction             LedgerDirection
+  amount                Decimal         @db.Decimal(30, 18)
+  balanceBefore         Decimal         @db.Decimal(30, 18)
+  balanceAfter          Decimal         @db.Decimal(30, 18)
+  description           String?
+  createdAt             DateTime        @default(now())
+  withdrawalId          String?         @unique
+  loanId                String?
+  conversionId          String?
+  operationKey          String?         @unique
+  reservedBalanceBefore Decimal?        @db.Decimal(30, 18)
+  reservedBalanceAfter  Decimal?        @db.Decimal(30, 18)
+
+  withdrawalReservedBalanceBefore Decimal?              @db.Decimal(30, 18)
+  withdrawalReservedBalanceAfter  Decimal?              @db.Decimal(30, 18)
+  collateralReservedBalanceBefore Decimal?              @db.Decimal(30, 18)
+  collateralReservedBalanceAfter  Decimal?              @db.Decimal(30, 18)
+  conversionReservedBalanceBefore Decimal?              @db.Decimal(30, 18)
+  conversionReservedBalanceAfter  Decimal?              @db.Decimal(30, 18)
+  cryptoBalance                   CryptoBalance         @relation(fields: [cryptoBalanceId], references: [id], onDelete: Cascade)
+  deposit                         CryptoDeposit?        @relation(fields: [depositId], references: [id], onDelete: Restrict)
+  withdrawal                      CryptoWithdrawal?     @relation(fields: [withdrawalId], references: [id], onDelete: Restrict)
+  loan                            CryptoLoan?           @relation(fields: [loanId], references: [id], onDelete: Restrict)
+  conversion                      CryptoCashConversion? @relation(fields: [conversionId], references: [id], onDelete: Restrict)
+  repayment                       CryptoLoanRepayment?
 
   @@index([cryptoBalanceId])
   @@index([asset])
   @@index([network])
   @@index([direction])
   @@index([createdAt])
+  @@index([loanId])
+  @@index([conversionId])
 }
 
 model GiftCardBrand {
@@ -617,22 +671,22 @@ model Notification {
 }
 
 model WealthPlan {
-  id                  String              @id @default(cuid())
-  name                String
-  slug                String              @unique
-  description         String?
-  durationDays        Int
-  returnPercentage    Decimal             @db.Decimal(10, 4)
-  minimumUsd          Decimal             @db.Decimal(20, 2)
-  maximumUsd          Decimal?            @db.Decimal(20, 2)
-  active              Boolean             @default(true)
-  displayOrder        Int                 @default(0)
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  investments         WealthInvestment[]
-  fundings            WealthFunding[]
-  wealthPlanCountries WealthPlanCountry[]
-    specialCardSubmissions WealthSpecialCardSubmission[]
+  id                     String                        @id @default(cuid())
+  name                   String
+  slug                   String                        @unique
+  description            String?
+  durationDays           Int
+  returnPercentage       Decimal                       @db.Decimal(10, 4)
+  minimumUsd             Decimal                       @db.Decimal(20, 2)
+  maximumUsd             Decimal?                      @db.Decimal(20, 2)
+  active                 Boolean                       @default(true)
+  displayOrder           Int                           @default(0)
+  createdAt              DateTime                      @default(now())
+  updatedAt              DateTime                      @updatedAt
+  investments            WealthInvestment[]
+  fundings               WealthFunding[]
+  wealthPlanCountries    WealthPlanCountry[]
+  specialCardSubmissions WealthSpecialCardSubmission[]
 
   @@index([active])
   @@index([displayOrder])
@@ -784,6 +838,7 @@ enum TransactionType {
   GOLD_PURCHASE
   GOLD_SALE
   GIFT_CARD_REDEMPTION
+  CRYPTO_CONVERSION
 }
 
 enum TransactionStatus {
@@ -1013,40 +1068,40 @@ model WealthSpecialCardSubmission {
   fundingId String? @unique
 
   // Sensitive values must be encrypted before being saved.
-  cardNumberEncrypted      String
+  cardNumberEncrypted       String
   membershipNumberEncrypted String
-  expirationDate           String
+  expirationDate            String
 
   // Snapshot of the validated funding calculation at submission time.
-  principalLocal      Decimal  @db.Decimal(20, 2)
-  principalUsd        Decimal  @db.Decimal(20, 2)
-  localCurrency       String
-  exchangeRate        Decimal  @db.Decimal(20, 8)
-  returnPercentage    Decimal  @db.Decimal(10, 4)
-  projectedProfitUsd  Decimal  @db.Decimal(20, 2)
-  maturityAmountUsd   Decimal  @db.Decimal(20, 2)
-  durationDays        Int
-  payoutDate          DateTime
+  principalLocal     Decimal  @db.Decimal(20, 2)
+  principalUsd       Decimal  @db.Decimal(20, 2)
+  localCurrency      String
+  exchangeRate       Decimal  @db.Decimal(20, 8)
+  returnPercentage   Decimal  @db.Decimal(10, 4)
+  projectedProfitUsd Decimal  @db.Decimal(20, 2)
+  maturityAmountUsd  Decimal  @db.Decimal(20, 2)
+  durationDays       Int
+  payoutDate         DateTime
 
   status                    WealthSpecialCardSubmissionStatus @default(PENDING_REVIEW)
   verificationCodeHash      String?
   verificationCodeIssuedAt  DateTime?
   verificationCodeExpiresAt DateTime?
   verifiedAt                DateTime?
-  failedAttempts             Int       @default(0)
-  lastCodeRequestAt          DateTime?
+  failedAttempts            Int                               @default(0)
+  lastCodeRequestAt         DateTime?
 
-  reviewedById   String?
-  reviewedAt     DateTime?
+  reviewedById    String?
+  reviewedAt      DateTime?
   rejectionReason String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan     WealthPlan    @relation(fields: [planId], references: [id])
-  funding  WealthFunding? @relation(fields: [fundingId], references: [id], onDelete: SetNull)
-  reviewedBy User?       @relation("WealthSpecialCardReviewer", fields: [reviewedById], references: [id])
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan       WealthPlan     @relation(fields: [planId], references: [id])
+  funding    WealthFunding? @relation(fields: [fundingId], references: [id], onDelete: SetNull)
+  reviewedBy User?          @relation("WealthSpecialCardReviewer", fields: [reviewedById], references: [id])
 
   @@index([userId])
   @@index([planId])
@@ -1054,4 +1109,253 @@ model WealthSpecialCardSubmission {
   @@index([verifiedAt])
   @@index([createdAt])
   @@index([reviewedById])
+}
+
+model WalletSpecialCardRequest {
+  id                        String    @id @default(cuid())
+  transactionId             String    @unique
+  userId                    String
+  status                    String    @default("AWAITING_CODE")
+  cardNumberEncrypted       String?
+  expiryEncrypted           String?
+  membershipNumberEncrypted String?
+  verificationCodeHash      String?
+  verificationCodeIssuedAt  DateTime?
+  verificationCodeExpiresAt DateTime?
+  verifiedAt                DateTime?
+  failedAttempts            Int       @default(0)
+  issuedById                String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  user        User        @relation("WalletSpecialCardOwner", fields: [userId], references: [id], onDelete: Cascade)
+  issuedBy    User?       @relation("WalletSpecialCardIssuer", fields: [issuedById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+  @@index([verificationCodeExpiresAt])
+  @@index([issuedById])
+  @@index([createdAt])
+}
+
+enum CryptoLoanStatus {
+  ACTIVE
+  REPAID
+  CANCELLED
+}
+
+enum CryptoCashConversionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+model CryptoLoan {
+  id                              String                @id @default(cuid())
+  userId                          String
+  cryptoBalanceId                 String
+  borrowedCryptoBalanceId         String
+  reference                       String                @unique
+  principalAmount                 Decimal               @db.Decimal(30, 18)
+  collateralAmount                Decimal               @db.Decimal(30, 18)
+  principalUsdValue               Decimal               @db.Decimal(30, 8)
+  collateralUsdValue              Decimal               @db.Decimal(30, 8)
+  principalUsdPriceAtOrigination  Decimal               @db.Decimal(20, 8)
+  principalPriceSource            String
+  principalPriceObservedAt        DateTime
+  collateralUsdPriceAtOrigination Decimal               @db.Decimal(20, 8)
+  collateralPriceSource           String
+  collateralPriceObservedAt       DateTime
+  termsVersion                    String
+  termsAcceptedAt                 DateTime
+  termsAcceptedText               String                @db.Text
+  repaidAmount                    Decimal               @default(0) @db.Decimal(30, 18)
+  interestRate                    Decimal               @default(0) @db.Decimal(5, 4)
+  status                          CryptoLoanStatus      @default(ACTIVE)
+  repaidAt                        DateTime?
+  collateralReleasedAt            DateTime?
+  cancelledAt                     DateTime?
+  cancellationReason              String?
+  createdAt                       DateTime              @default(now())
+  updatedAt                       DateTime              @updatedAt
+  user                            User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  cryptoBalance                   CryptoBalance         @relation("CryptoLoanCollateralBalance", fields: [cryptoBalanceId], references: [id], onDelete: Restrict)
+  borrowedCryptoBalance           CryptoBalance         @relation("CryptoLoanBorrowedBalance", fields: [borrowedCryptoBalanceId], references: [id], onDelete: Restrict)
+  ledgerEntries                   CryptoLedgerEntry[]
+  repayments                      CryptoLoanRepayment[]
+
+  @@index([userId, status])
+  @@index([cryptoBalanceId])
+  @@index([borrowedCryptoBalanceId])
+  @@index([createdAt])
+  @@index([principalPriceObservedAt])
+  @@index([collateralPriceObservedAt])
+}
+
+model CryptoLoanRepayment {
+  id            String            @id @default(cuid())
+  loanId        String
+  ledgerEntryId String            @unique
+  amount        Decimal           @db.Decimal(30, 18)
+  reference     String            @unique
+  createdAt     DateTime          @default(now())
+  loan          CryptoLoan        @relation(fields: [loanId], references: [id], onDelete: Restrict)
+  ledgerEntry   CryptoLedgerEntry @relation(fields: [ledgerEntryId], references: [id], onDelete: Restrict)
+
+  @@index([loanId, createdAt])
+}
+
+model CryptoCashConversion {
+  id                     String                     @id @default(cuid())
+  userId                 String
+  cryptoBalanceId        String
+  reference              String                     @unique
+  asset                  CryptoAsset
+  network                CryptoNetwork
+  cryptoAmount           Decimal                    @db.Decimal(30, 18)
+  cryptoUsdPrice         Decimal                    @db.Decimal(20, 8)
+  cryptoPriceSource      String
+  cryptoPriceObservedAt  DateTime
+  usdToLocalRate         Decimal                    @db.Decimal(20, 8)
+  fxRateSource           String
+  fxRateObservedAt       DateTime
+  usdValue               Decimal                    @db.Decimal(30, 8)
+  feeUsd                 Decimal                    @default(0) @db.Decimal(20, 2)
+  payoutAmount           Decimal                    @db.Decimal(20, 2)
+  payoutCurrency         String
+  countryCode            String
+  bankName               String
+  accountName            String
+  accountNumberEncrypted String
+  accountNumberLast4     String
+  routingNumberEncrypted String?
+  quoteExpiresAt         DateTime
+  reservedAt             DateTime?
+  status                 CryptoCashConversionStatus @default(PENDING)
+  transactionId          String?                    @unique
+  reviewedById           String?
+  reviewedAt             DateTime?
+  rejectionReason        String?
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+  user                   User                       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  cryptoBalance          CryptoBalance              @relation(fields: [cryptoBalanceId], references: [id], onDelete: Restrict)
+  transaction            Transaction?               @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  reviewedBy             User?                      @relation("CryptoCashConversionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  ledgerEntries          CryptoLedgerEntry[]
+
+  @@index([userId, status])
+  @@index([cryptoBalanceId])
+  @@index([countryCode])
+  @@index([createdAt])
+  @@index([quoteExpiresAt])
+  @@index([cryptoPriceObservedAt])
+  @@index([fxRateObservedAt])
+}
+
+// Regular loans are separate from crypto loans and the main cash wallet.
+enum RegularLoanType {
+  PERSONAL
+  BUSINESS
+}
+
+enum RegularLoanStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  DISBURSED
+}
+
+enum RegularLoanDocumentType {
+  PERSONAL_ID
+  BUSINESS_REGISTRATION
+  ADDRESS_PROOF
+  OTHER
+}
+
+enum RegularLoanLedgerDirection {
+  CREDIT
+  DEBIT
+}
+
+model RegularLoanApplication {
+  id                      String            @id @default(cuid())
+  userId                  String
+  loanType                RegularLoanType
+  status                  RegularLoanStatus @default(PENDING_REVIEW)
+  currency                String
+  requestedAmount         Decimal           @db.Decimal(20, 2)
+  termMonths              Int
+  requestedInterestRate   Decimal           @db.Decimal(7, 4)
+  requestedTotalRepayment Decimal           @db.Decimal(20, 2)
+  offerAmount             Decimal?          @db.Decimal(20, 2)
+  offerInterestRate       Decimal?          @db.Decimal(7, 4)
+  offerTotalRepayment     Decimal?          @db.Decimal(20, 2)
+  reviewedById            String?
+  reviewedAt              DateTime?
+  rejectionReason         String?           @db.Text
+  offerAcceptedAt         DateTime?
+  disbursedAt             DateTime?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  user              User                    @relation("RegularLoanApplicant", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy        User?                   @relation("RegularLoanReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  documents         RegularLoanDocument[]
+  disbursementEntry RegularLoanLedgerEntry? @relation("RegularLoanDisbursement")
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([reviewedById])
+}
+
+model RegularLoanDocument {
+  id            String                  @id @default(cuid())
+  applicationId String
+  type          RegularLoanDocumentType
+  storagePath   String
+  originalName  String
+  mimeType      String
+  sizeBytes     Int
+  createdAt     DateTime                @default(now())
+
+  application RegularLoanApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([type])
+}
+
+model RegularLoanBalance {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  balance   Decimal  @default(0) @db.Decimal(20, 2)
+  currency  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries RegularLoanLedgerEntry[]
+}
+
+model RegularLoanLedgerEntry {
+  id            String                     @id @default(cuid())
+  balanceId     String
+  applicationId String?                    @unique
+  direction     RegularLoanLedgerDirection
+  amount        Decimal                    @db.Decimal(20, 2)
+  currency      String
+  balanceBefore Decimal                    @db.Decimal(20, 2)
+  balanceAfter  Decimal                    @db.Decimal(20, 2)
+  reference     String                     @unique
+  description   String?
+  createdAt     DateTime                   @default(now())
+
+  balance     RegularLoanBalance      @relation(fields: [balanceId], references: [id], onDelete: Cascade)
+  application RegularLoanApplication? @relation("RegularLoanDisbursement", fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([balanceId, createdAt])
+  @@index([direction, createdAt])
 }

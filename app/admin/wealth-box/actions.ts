@@ -756,18 +756,9 @@ export async function rejectSpecialCardSubmission(
     formData.get("reason") ?? "",
   ).trim();
 
-  const allowedReasons = [
-    "Insufficient funds",
-    "Wrong card details",
-  ];
-
-  if (!submissionId) {
-    throw new Error("Special Card submission ID is required.");
-  }
-
-  if (!allowedReasons.includes(reason)) {
-    throw new Error("Select a valid rejection reason.");
-  }
+  if (!reason || reason.length > 500) {
+  throw new Error("Enter a rejection reason of no more than 500 characters.");
+}
 
   const now = new Date();
 

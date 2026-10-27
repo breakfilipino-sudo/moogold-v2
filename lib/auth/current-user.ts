@@ -67,6 +67,25 @@ export const getCurrentUser = cache(async () => {
     }ms`,
   );
 
+  const emailMatchedUser = authUser.email
+    ? await prisma.user.findUnique({
+        where: { email: authUser.email.trim().toLowerCase() },
+        select: { authUserId: true },
+      })
+    : null;
+
+  console.log("[auth-diagnostic] Email profile check:", {
+    authenticatedEmailAvailable: Boolean(authUser.email),
+    emailProfileFound: Boolean(emailMatchedUser),
+    emailProfileAuthIdMatches: Boolean(emailMatchedUser && emailMatchedUser.authUserId === authUser.id),
+  });
+
+  console.log("[auth-diagnostic] Dashboard profile check:", {
+    authenticatedUserFound: Boolean(authUser),
+    profileFound: Boolean(user),
+    profileAuthIdMatches: Boolean(user && user.authUserId === authUser.id),
+  });
+
   if (!user) {
     redirect("/login");
   }

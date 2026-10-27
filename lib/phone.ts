@@ -32,97 +32,97 @@ export const COUNTRIES: readonly CountryInfo[] = [
     code: "US",
     name: "United States",
     dialCode: "+1",
-    flag: "🇺🇸",
+    flag: "\u{1F1FA}\u{1F1F8}",
   },
   {
     code: "PH",
     name: "Philippines",
     dialCode: "+63",
-    flag: "🇵🇭",
+    flag: "\u{1F1F5}\u{1F1ED}",
   },
   {
     code: "SG",
     name: "Singapore",
     dialCode: "+65",
-    flag: "🇸🇬",
+    flag: "\u{1F1F8}\u{1F1EC}",
   },
   {
     code: "MY",
     name: "Malaysia",
     dialCode: "+60",
-    flag: "🇲🇾",
+    flag: "\u{1F1F2}\u{1F1FE}",
   },
   {
     code: "KE",
     name: "Kenya",
     dialCode: "+254",
-    flag: "🇰🇪",
+    flag: "\u{1F1F0}\u{1F1EA}",
   },
   {
     code: "GH",
     name: "Ghana",
     dialCode: "+233",
-    flag: "🇬🇭",
+    flag: "\u{1F1EC}\u{1F1ED}",
   },
   {
     code: "NG",
     name: "Nigeria",
     dialCode: "+234",
-    flag: "🇳🇬",
+    flag: "\u{1F1F3}\u{1F1EC}",
   },
   {
     code: "ZA",
     name: "South Africa",
     dialCode: "+27",
-    flag: "🇿🇦",
+    flag: "\u{1F1FF}\u{1F1E6}",
   },
   {
     code: "GB",
     name: "United Kingdom",
     dialCode: "+44",
-    flag: "🇬🇧",
+    flag: "\u{1F1EC}\u{1F1E7}",
   },
   {
     code: "CA",
     name: "Canada",
     dialCode: "+1",
-    flag: "🇨🇦",
+    flag: "\u{1F1E8}\u{1F1E6}",
   },
   {
     code: "IN",
     name: "India",
     dialCode: "+91",
-    flag: "🇮🇳",
+    flag: "\u{1F1EE}\u{1F1F3}",
   },
   {
     code: "CN",
     name: "China",
     dialCode: "+86",
-    flag: "🇨🇳",
+    flag: "\u{1F1E8}\u{1F1F3}",
   },
   {
     code: "AE",
     name: "United Arab Emirates",
     dialCode: "+971",
-    flag: "🇦🇪",
+    flag: "\u{1F1E6}\u{1F1EA}",
   },
   {
     code: "BR",
     name: "Brazil",
     dialCode: "+55",
-    flag: "🇧🇷",
+    flag: "\u{1F1E7}\u{1F1F7}",
   },
   {
     code: "VN",
     name: "Vietnam",
     dialCode: "+84",
-    flag: "🇻🇳",
+    flag: "\u{1F1FB}\u{1F1F3}",
   },
   {
     code: "TR",
     name: "Turkey",
     dialCode: "+90",
-    flag: "🇹🇷",
+    flag: "\u{1F1F9}\u{1F1F7}",
   },
 ];
 
@@ -327,6 +327,58 @@ export function normalizePhone(
   };
 }
 
+export function isPlausibleMobilePhone(
+  phone: string,
+  countryCode: SupportedCountry,
+): boolean {
+  const dialCode = getCountryDialCode(countryCode);
+  if (!dialCode || !phone.startsWith(dialCode)) {
+    return false;
+  }
+
+  const national = phone.slice(dialCode.length);
+  if (!/^\d+$/.test(national)) {
+    return false;
+  }
+
+  // These checks reject obvious non-mobile or malformed numbers.
+  // They cannot establish whether a number is assigned or active.
+  switch (countryCode) {
+    case "US":
+    case "CA":
+      return /^[2-9]\d{2}[2-9]\d{6}$/.test(national);
+    case "PH":
+      return /^9\d{9}$/.test(national);
+    case "SG":
+      return /^[89]\d{7}$/.test(national);
+    case "MY":
+      return /^1\d{8,9}$/.test(national);
+    case "KE":
+      return /^[17]\d{8}$/.test(national);
+    case "GH":
+      return /^[2-5]\d{8}$/.test(national);
+    case "NG":
+      return /^[789]\d{9}$/.test(national);
+    case "ZA":
+      return /^[678]\d{8}$/.test(national);
+    case "GB":
+      return /^7\d{9}$/.test(national);
+    case "IN":
+      return /^[6-9]\d{9}$/.test(national);
+    case "CN":
+      return /^1[3-9]\d{9}$/.test(national);
+    case "AE":
+      return /^5\d{8}$/.test(national);
+    case "BR":
+      return /^\d{2}9\d{8}$/.test(national);
+    case "VN":
+      return /^[35789]\d{8}$/.test(national);
+    case "TR":
+      return /^5\d{9}$/.test(national);
+    default:
+      return false;
+  }
+}
 export function getPhoneValidationMessage(
   countryCode?: SupportedCountry,
 ): string {

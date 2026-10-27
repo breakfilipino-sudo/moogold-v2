@@ -7,6 +7,7 @@ import {
   Coins,
   CreditCard,
   Gift,
+  HandCoins,
   Landmark,
   MessageCircle,
   ShieldCheck,
@@ -156,6 +157,13 @@ export default function AdminPage() {
               label="Digital Assets"
               title="Crypto"
               description="Manage crypto balances, deposits, transactions, and withdrawals."
+            />
+            <AdminCard
+              href="/admin/loans"
+              icon={HandCoins}
+              label="Loan Management"
+              title="Loans"
+              description="Review customer loan applications, documents, and repayment offers."
             />
           </div>
         </section>

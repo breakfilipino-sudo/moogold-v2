@@ -19,6 +19,7 @@ import {
 
 import {
   getNotificationSummary,
+  getUnreadNotificationCountAction,
   markAllNotificationsRead,
   markNotificationRead,
 } from "@/app/dashboard/notifications/actions";
@@ -133,7 +134,15 @@ export default function Header({ userName }: HeaderProps) {
           );
         });
 
-  async function loadNotifications() {
+  async function loadNotificationCount() {
+    try {
+      const count = await getUnreadNotificationCountAction();
+      setNotificationCount(count);
+    } catch {
+      // Keep the header usable if notification loading fails.
+    }
+  }
+async function loadNotifications() {
     try {
       setNotificationsLoading(true);
 
@@ -160,16 +169,11 @@ export default function Header({ userName }: HeaderProps) {
 
   useEffect(() => {
     const initialLoadTimeout = window.setTimeout(() => {
-      void loadNotifications();
+      void loadNotificationCount();
     }, 0);
-
-    const interval = window.setInterval(() => {
-      void loadNotifications();
-    }, 30_000);
 
     return () => {
       window.clearTimeout(initialLoadTimeout);
-      window.clearInterval(interval);
     };
   }, []);
 

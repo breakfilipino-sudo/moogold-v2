@@ -67,7 +67,7 @@ const en = {
   heroEyebrow: "Your money",
   heroTitle: "Money made simpler.",
   heroDescription:
-    "One account to manage your money, explore gold, and access digital financial services.",
+    "One account to manage your money, explore gold, access loans, and grow with Wealth Box.",
   heroTagline: "More than just a wallet.",
 oneAccount: "One account",
   globalReady: "One account. Global-ready.",
@@ -269,7 +269,7 @@ const translations: Record<LanguageCode, TranslationOverrides> = {
     createAccount: "Gumawa ng account",
     heroTitle: "Mas simple ang paghawak ng pera.",
     heroDescription:
-      "Isang account para pamahalaan ang iyong pera, tumingin ng ginto, at gumamit ng mga digital financial service.",
+      "Isang account para pamahalaan ang iyong pera, tumingin ng ginto, mag-access ng mga loan, at palaguin ang pera sa Wealth Box.",
     heroTagline: "Higit pa sa isang wallet.",
     globalReady: "Isang account para sa iba't ibang bansa.",
     builtForSecurity: "Dinisenyo para sa seguridad.",
@@ -455,7 +455,7 @@ const translations: Record<LanguageCode, TranslationOverrides> = {
     createAccount: "Buka akaun",
     heroTitle: "Urus wang dengan lebih mudah.",
     heroDescription:
-      "Satu akaun untuk mengurus wang anda, meneroka emas dan mengakses perkhidmatan kewangan digital.",
+      "Satu akaun untuk mengurus wang anda, meneroka emas, mengakses pinjaman dan mengembangkan wang melalui Wealth Box.",
     heroTagline: "Lebih daripada sekadar dompet.",
     globalReady: "Satu akaun untuk pelbagai negara.",
     builtForSecurity: "Direka dengan mengutamakan keselamatan.",
@@ -640,7 +640,7 @@ const translations: Record<LanguageCode, TranslationOverrides> = {
     logIn: "登录",
     createAccount: "创建账户",
     heroTitle: "让资金管理更简单。",
-    heroDescription: "使用一个账户管理资金、了解黄金并访问数字金融服务。",
+    heroDescription: "使用一个账户管理资金、探索黄金、申请贷款，并通过 Wealth Box 增长财富。",
     heroTagline: "不只是一个钱包。",
     globalReady: "一个账户，服务多个国家。",
     builtForSecurity: "以安全为设计重点。",

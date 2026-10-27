@@ -117,6 +117,31 @@ export default async function WithdrawPage({
     redirect("/dashboard/profile");
   }
 
+  let withdrawalExchangeRate: number | null =
+    financialConfig.currency === "USD" ? 1 : null;
+
+  if (financialConfig.currency !== "USD") {
+    try {
+      const response = await fetch(
+        `https://api.frankfurter.dev/v2/rate/USD/${encodeURIComponent(
+          financialConfig.currency,
+        )}`,
+        { cache: "no-store" },
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const rate = Number(data?.rate);
+
+        if (Number.isFinite(rate) && rate > 0) {
+          withdrawalExchangeRate = rate;
+        }
+      }
+    } catch (error) {
+      console.error("Withdrawal currency conversion failed:", error);
+    }
+  }
+
   const cashBalance = Number(
     user.wallet?.cashBalance ?? 0,
   );
@@ -137,6 +162,7 @@ export default async function WithdrawPage({
   return (
     <WithdrawForm
       cashBalance={cashBalance}
+      withdrawalExchangeRate={withdrawalExchangeRate}
       accountHolder={accountHolder}
       withdrawalConfig={withdrawalConfig}
       currency={financialConfig.currency}

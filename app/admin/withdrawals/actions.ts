@@ -134,6 +134,9 @@ export async function approveWithdrawal(
         );
       }
 
+      const isLoanCashout =
+        transaction.withdrawalDetails.notes === "REGULAR_LOAN_CASHOUT";
+
       await tx.transaction.update({
         where: {
           id: transaction.id,
@@ -142,12 +145,13 @@ export async function approveWithdrawal(
           status: "COMPLETED",
           approvedById: admin.id,
           approvedAt: new Date(),
-          description:
-            transaction.description ??
-            `Withdrawal completed via ${
-              transaction.withdrawalDetails
-                .bankName ?? "bank transfer"
-            }.`,
+          description: isLoanCashout
+            ? "Loan Balance cash-out approved."
+            : transaction.description ??
+              `Withdrawal completed via ${
+                transaction.withdrawalDetails
+                  .bankName ?? "bank transfer"
+              }.`,
         },
       });
 
@@ -155,13 +159,18 @@ export async function approveWithdrawal(
         data: {
           userId: transaction.userId,
           type: "WITHDRAWAL",
-          title: "Withdrawal approved",
-          message:
-  `Your withdrawal of $${(
-    transaction.usdAmount ??
-    transaction.amount
-  ).toFixed(2)} has been approved.`,
-          href: "/dashboard/withdraw",
+          title: isLoanCashout
+            ? "Loan Balance cash-out approved"
+            : "Withdrawal approved",
+          message: isLoanCashout
+            ? `Your Loan Balance cash-out of ${transaction.currency} ${transaction.amount.toFixed(2)} has been approved.`
+            : `Your withdrawal of $${(
+                transaction.usdAmount ??
+                transaction.amount
+              ).toFixed(2)} has been approved.`,
+          href: isLoanCashout
+            ? "/dashboard/loan"
+            : "/dashboard/withdraw",
         },
       });
     });
@@ -179,6 +188,7 @@ export async function approveWithdrawal(
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/loan");
   revalidatePath("/dashboard/wallet");
   revalidatePath("/dashboard/withdraw");
   revalidatePath("/dashboard/referrals");
@@ -277,6 +287,70 @@ export async function rejectWithdrawal(
         );
       }
 
+      if (
+        transaction.withdrawalDetails.notes === "REGULAR_LOAN_CASHOUT"
+      ) {
+        const loanBalance = await tx.regularLoanBalance.findUnique({
+          where: { userId: transaction.userId },
+        });
+
+        if (!loanBalance) {
+          throw new Error(
+            "The customer's Loan Balance could not be found. Rejection was not completed.",
+          );
+        }
+
+        if (loanBalance.currency !== transaction.currency) {
+          throw new Error(
+            "The Loan Balance currency does not match this cash-out. Rejection was not completed.",
+          );
+        }
+
+        const balanceBefore = loanBalance.balance;
+        const balanceAfter = balanceBefore.plus(transaction.amount);
+
+        await tx.regularLoanBalance.update({
+          where: { id: loanBalance.id },
+          data: { balance: { increment: transaction.amount } },
+        });
+
+        await tx.transaction.update({
+          where: { id: transaction.id },
+          data: {
+            status: "REJECTED",
+            rejectionReason,
+            approvedById: admin.id,
+            approvedAt: new Date(),
+            description: "Loan Balance cash-out rejected and refunded.",
+          },
+        });
+
+        await tx.regularLoanLedgerEntry.create({
+          data: {
+            balanceId: loanBalance.id,
+            applicationId: null,
+            direction: "CREDIT",
+            amount: transaction.amount,
+            currency: transaction.currency,
+            balanceBefore,
+            balanceAfter,
+            reference: `LOAN_CASHOUT_REFUND_${transaction.id}`,
+            description: `Refund for rejected Loan Balance cash-out ${transaction.reference}`,
+          },
+        });
+
+        await tx.notification.create({
+          data: {
+            userId: transaction.userId,
+            type: "WITHDRAWAL",
+            title: "Loan Balance cash-out rejected",
+            message: `Your Loan Balance cash-out of ${transaction.currency} ${transaction.amount.toFixed(2)} was rejected and returned to your Loan Balance. Reason: ${rejectionReason}`,
+            href: "/dashboard/loan",
+          },
+        });
+
+        return;
+      }
       const wallet =
         await tx.wallet.findUnique({
           where: {
@@ -445,6 +519,7 @@ export async function rejectWithdrawal(
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/loan");
   revalidatePath("/dashboard/wallet");
   revalidatePath("/dashboard/withdraw");
   revalidatePath("/dashboard/referrals");

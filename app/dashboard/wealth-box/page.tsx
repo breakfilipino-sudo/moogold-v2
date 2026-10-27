@@ -1,5 +1,8 @@
 import {
   BriefcaseBusiness,
+  TrendingUp,
+  Sparkles,
+  ArrowUpRight,
 } from "lucide-react";
 
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -256,7 +259,7 @@ export default async function WealthBoxPage() {
   });
 
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-6 pb-12">
       {approvalNotification ? (
         <ApprovalNotice
           notificationId={approvalNotification.id}
@@ -265,102 +268,112 @@ export default async function WealthBoxPage() {
         />
       ) : null}
 
-      <section>
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-            <BriefcaseBusiness className="h-5 w-5" />
+      {/* Header section */}
+      <section className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-3.5">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-md shadow-emerald-600/20">
+            <BriefcaseBusiness className="h-6 w-6" />
           </div>
-
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700/55">
-              MooGold
-            </p>
-
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#10201b] sm:text-[26px]">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600">
+                MooGold Earn
+              </span>
+              <Sparkles className="h-3 w-3 text-emerald-500" />
+            </div>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
               Wealth Box
             </h1>
-            <p className="mt-1 whitespace-nowrap text-[11px] font-semibold leading-5 text-[#52655c] sm:text-sm">Grow your money. Earn more.</p>
+            <p className="text-xs font-medium text-slate-500">
+              Grow your money. Earn daily profits seamlessly.
+            </p>
           </div>
         </div>
-
-
       </section>
 
-      <section className="overflow-hidden rounded-[26px] border border-[#d7e3dd] bg-white shadow-[0_12px_40px_rgba(16,32,27,0.05)]">
-        <div className="bg-[#10201b] px-5 py-6 text-white sm:px-7 sm:py-7">
-          <div className="flex items-center justify-between gap-3 sm:gap-5">
-            <div className="min-w-0 flex-1 text-left">
-              <p className="text-sm font-extrabold">
-                Your active Investments
-              </p>
+      {/* Hero Balance Card (Styled cleanly like your modern screenshot) */}
+      <section className="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-slate-950 via-[#10201b] to-emerald-950 p-6 text-white shadow-xl shadow-slate-950/15 sm:p-8">
+        <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute -left-10 -bottom-10 h-48 w-48 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
 
-              <p className="mt-2 min-w-0 text-[clamp(1.5rem,7vw,2.25rem)] font-extrabold leading-tight tracking-tight sm:text-[42px]">
-                {formatLocalAmount(
-                  currentBalance,
-                  localCurrency,
-                )}
-              </p>
+        <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold tracking-wide text-emerald-300 backdrop-blur-md">
+              <TrendingUp className="h-3.5 w-3.5" />
+              <span>Active Portfolio Balance</span>
+            </div>
 
-              {activeInvestment && activePlanDurationDays > 0 ? (
-                <p className="mt-1 min-w-0 break-words [overflow-wrap:anywhere] text-[11px] font-semibold leading-4 text-emerald-200 sm:text-xs">
+            <p className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">
+              {formatLocalAmount(
+                currentBalance,
+                localCurrency,
+              )}
+            </p>
+
+            {activeInvestment && activePlanDurationDays > 0 ? (
+              <div className="mt-2.5 flex items-center gap-2 text-xs font-semibold text-emerald-200/90">
+                <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>
                   Earned +{formatLocalAmount(
                     activeInvestmentProfitLocal,
                     localCurrency,
-                  )} for {activePlanDurationDays}-day plan
-                </p>
-              ) : null}
-            </div>
-
-            <div className="flex shrink-0 flex-col items-end gap-3">
-
-
-              {activeInvestment ? (
-                <CashOutButton
-                  maturityDate={
-                    activeInvestment.maturityDate
-                  }
-                  isMatured={
-                    activeInvestment.status === "MATURED"
-                  }
-                />
-              ) : null}
-            </div>
+                  )} ({activePlanDurationDays}-day growth plan)
+                </span>
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-slate-400">
+                No active earnings locked yet. Select a plan below to begin.
+              </p>
+            )}
           </div>
+
+          <div className="flex shrink-0 items-center">
+          <CashOutButton
+            maturityDate={activeInvestment?.maturityDate ?? null}
+            isMatured={activeInvestment?.status === "MATURED"}
+          />
+        </div>
         </div>
 
-        {investments.length > 0 &&
-        dailyEarnings.length > 0 ? (
-          <div className="hidden divide-y divide-[#e7eeea]">
-            {dailyEarnings.map((earning) => (
-              <div
-                key={earning.id}
-                className="flex items-center justify-between gap-4 px-5 py-4 sm:px-7"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-[#10201b]">
-                    {formatEarningDate(earning.date)}
-                  </p>
-
-                  <p className="mt-1 text-[11px] font-semibold text-[#52655c]">
-                    Day {earning.dayNumber}
-                  </p>
+        {/* Earnings breakdown strip inside the hero card if available */}
+        {investments.length > 0 && dailyEarnings.length > 0 ? (
+          <div className="mt-6 border-t border-white/10 pt-5">
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-300 mb-3">
+              <span>Recent Daily Yields</span>
+              <span className="text-emerald-400 font-bold">{dailyEarnings.length} Total Payouts</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+              {dailyEarnings.slice(0, 6).map((earning) => (
+                <div
+                  key={earning.id}
+                  className="flex items-center justify-between rounded-2xl bg-white/[0.06] px-4 py-3 border border-white/5 backdrop-blur-sm transition hover:bg-white/[0.09]"
+                >
+                  <div>
+                    <p className="text-xs font-bold text-white">
+                      {formatEarningDate(earning.date)}
+                    </p>
+                    <p className="text-[10px] font-medium text-emerald-400/80">
+                      Day {earning.dayNumber} earnings
+                    </p>
+                  </div>
+                  <span className="text-xs font-black text-emerald-300 bg-emerald-500/10 px-2.5 py-1 rounded-xl">
+                    +{formatLocalAmount(
+                      earning.amount,
+                      localCurrency,
+                    )}
+                  </span>
                 </div>
-
-                <p className="shrink-0 text-sm font-extrabold text-emerald-700">
-                  +
-                  {formatLocalAmount(
-                    earning.amount,
-                    localCurrency,
-                  )}
-                </p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         ) : null}
       </section>
 
+      {/* Plans Section */}
       {planData.length > 0 ? (
-        <section>
+        <section className="space-y-4 pt-2">
+
+
           <WealthBoxForm
             plans={planData}
             currency={localCurrency}
@@ -368,18 +381,18 @@ export default async function WealthBoxPage() {
           />
         </section>
       ) : (
-        <section className="rounded-[24px] border border-[#d7e3dd] bg-white px-6 py-12 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-            <BriefcaseBusiness className="h-5 w-5" />
+        <section className="rounded-[30px] border border-slate-200/80 bg-white px-6 py-16 text-center shadow-sm">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 shadow-inner">
+            <ArrowUpRight className="h-6 w-6" />
           </div>
 
-          <h2 className="mt-5 text-base font-bold text-[#10201b]">
-            Wealth Box plans are coming soon
+          <h2 className="mt-4 text-lg font-bold text-slate-900">
+            Wealth Box plans coming soon
           </h2>
 
-          <p className="mx-auto mt-2 max-w-md text-sm font-semibold leading-6 text-[#52655c]">
+          <p className="mx-auto mt-1.5 max-w-md text-sm font-medium text-slate-500 leading-relaxed">
             There are currently no active Wealth Box
-            plans available for your registered country.
+            plans available for your registered country. Please check back later.
           </p>
         </section>
       )}

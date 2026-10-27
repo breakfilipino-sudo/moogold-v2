@@ -14,7 +14,7 @@ import {
   verifyRegistrationOtp,
 } from "@/app/auth/actions";
 
-import AuthShell from "@/components/auth/auth-shell";
+
 import { translate } from "@/lib/i18n/translations";
 
 const MAX_REQUESTS = 3;
@@ -26,6 +26,7 @@ export default function RegisterVerifyClient() {
   const params = useSearchParams();
 
   const phone = params.get("phone") ?? "";
+  const email = (params.get("email") ?? "").trim().toLowerCase();
 
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -43,10 +44,10 @@ export default function RegisterVerifyClient() {
 
   // Redirect if the verification URL has no phone number.
   useEffect(() => {
-    if (!phone) {
+    if (!phone || !email) {
       router.replace("/register");
     }
-  }, [phone, router]);
+  }, [phone, email, router]);
 
   // Resend countdown.
   useEffect(() => {
@@ -100,6 +101,7 @@ export default function RegisterVerifyClient() {
     try {
       const formData = new FormData();
 
+      formData.set("email", email);
       formData.set("phone", phone);
       formData.set("token", token);
 
@@ -118,7 +120,7 @@ export default function RegisterVerifyClient() {
 
       if (result?.success) {
         router.replace(
-          `/register/pin?phone=${encodeURIComponent(phone)}`,
+          `/register/pin?phone=${encodeURIComponent(phone)}&email=${encodeURIComponent(email)}`,
         );
 
         return;
@@ -272,7 +274,7 @@ export default function RegisterVerifyClient() {
     try {
       const formData = new FormData();
 
-      formData.set("phone", phone);
+      formData.set("email", email);
 
       const result = await resendRegistrationOtp(formData);
 
@@ -307,34 +309,34 @@ export default function RegisterVerifyClient() {
     Math.ceil(lockRemaining / 60),
   );
 
-  if (!phone) {
-    return null;
+  if (!phone || !email) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f7faf8] px-6 text-center text-sm text-[#65736c]">
+        Returning to registration…
+      </main>
+    );
   }
 
   return (
-    <AuthShell
-      step={2}
-      eyebrow={t("verifyYourPhone")}
-      title={t("verifyYourPhone")}
-      description={t("verificationDescription")}
-    >
-      <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur-xl sm:p-8">
-        <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-400/15 bg-emerald-400/10">
-          <MessageSquareLock className="h-6 w-6 text-emerald-400" />
+    <main className="flex h-[80dvh] min-h-0 items-center justify-center bg-[#eef3f0] px-4 py-8 text-[#17231e] sm:h-auto sm:min-h-screen sm:px-6 registration-page-offwhite">
+      <section className="w-full max-w-md rounded-[28px] border border-[#e1e9e4] bg-white p-5 shadow-[0_24px_80px_rgba(20,45,35,0.12)] sm:p-8">
+      <div className="rounded-[24px]">
+        <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50">
+          <MessageSquareLock className="h-6 w-6 text-[#138a5d]" />
         </div>
 
-        <p className="text-center text-xs font-black uppercase tracking-widest text-white/35">
+        <p className="text-center text-xs font-black uppercase tracking-widest text-[#718078]">
           {t("verificationCode")}
         </p>
 
-        <p className="mt-2 text-center text-lg font-black tracking-wide text-white">
-          {phone}
+        <p className="mt-2 break-all text-center text-lg font-black tracking-wide text-[#17231e]">
+          {email}
         </p>
 
         {error && (
           <div
             role="alert"
-            className="mt-5 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-center text-sm font-semibold leading-5 text-red-200"
+            className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center text-sm font-semibold leading-5 text-red-700"
           >
             {error}
           </div>
@@ -360,26 +362,26 @@ export default function RegisterVerifyClient() {
               }
               onKeyDown={(event) => handleKeyDown(index, event)}
               onPaste={handlePaste}
-              className="h-14 w-11 rounded-2xl border border-white/10 bg-black/20 text-center text-xl font-black text-white outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-400/10 disabled:cursor-not-allowed disabled:opacity-50 sm:h-16 sm:w-14"
+              className="h-14 w-11 rounded-xl border border-[#d8e3dc] bg-white text-center text-xl font-bold text-[#17231e] outline-none transition focus:border-[#138a5d] focus:ring-4 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-50 sm:h-16 sm:w-14"
             />
           ))}
         </div>
 
         <div className="mt-7 text-center">
           {loading ? (
-            <p className="text-sm font-bold text-white/45">
+            <p className="text-sm font-bold text-[#65736c]">
               {t("verifying")}
             </p>
           ) : lockRemaining > 0 ? (
-            <p className="text-sm font-bold text-red-300">
+            <p className="text-sm font-bold text-red-600">
               {`Try again in ${lockMinutes} ${
                 lockMinutes === 1 ? "minute" : "minutes"
               }.`}
             </p>
           ) : countdown > 0 ? (
-            <p className="text-sm text-white/35">
+            <p className="text-sm text-[#65736c]">
               Didn&apos;t receive it?{" "}
-              <span className="font-black text-white/65">
+              <span className="font-bold text-[#17231e]">
                 {t("resendIn")} {countdown}s
               </span>
             </p>
@@ -388,17 +390,17 @@ export default function RegisterVerifyClient() {
               type="button"
               onClick={resendOtp}
               disabled={loading}
-              className="text-sm font-black text-emerald-400 transition hover:text-emerald-300 disabled:opacity-50"
+              className="text-sm font-bold text-[#138a5d] transition hover:text-[#0d704c] disabled:opacity-50"
             >
               {t("resendCode")}
             </button>
           )}
         </div>
 
-        <div className="mt-7 flex items-start gap-3 rounded-2xl bg-black/20 p-4">
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+        <div className="mt-7 flex items-start gap-3 rounded-xl bg-[#f3f7f4] p-4">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#138a5d]" />
 
-          <p className="text-xs leading-5 text-white/40">
+          <p className="text-xs leading-5 text-[#65736c]">
             Never share your verification code with anyone, including
             someone claiming to be MooGold support.
           </p>
@@ -406,12 +408,13 @@ export default function RegisterVerifyClient() {
 
         <Link
           href="/register"
-          className="mt-6 flex items-center justify-center gap-2 text-sm font-bold text-white/35 transition hover:text-white"
+          className="mt-6 flex items-center justify-center gap-2 text-sm font-bold text-[#65736c] transition hover:text-[#138a5d]"
         >
           <ArrowLeft className="h-4 w-4" />
           {t("backToRegistration")}
         </Link>
       </div>
-    </AuthShell>
+      </section>
+    </main>
   );
 }

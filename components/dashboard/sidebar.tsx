@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -102,11 +103,6 @@ export default function Sidebar({
 
     setLoggingOut(true);
 
-    try {
-      localStorage.removeItem("moogold-login-account");
-    } catch {
-      // Ignore localStorage errors.
-    }
 
     await signOut();
   }
@@ -118,8 +114,8 @@ export default function Sidebar({
           href="/dashboard/wallet"
           className="flex items-center gap-3"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-400 text-base font-black text-[#06100d]">
-            M
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl">
+            <Image src="/images/moogold-logo.png" alt="" aria-hidden="true" width={40} height={40} className="h-full w-full object-contain" />
           </div>
 
           <div>

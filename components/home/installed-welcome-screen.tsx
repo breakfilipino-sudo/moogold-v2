@@ -1,4 +1,5 @@
-﻿"use client";
+"use client";
+import Image from "next/image";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -266,6 +267,16 @@ export default function InstalledWelcomeScreen({
       />
 
       <section className="relative mx-auto flex w-full max-w-md flex-col">
+        <div className="mb-7 flex justify-center sm:justify-start">
+          <Image
+            src="/images/moogold-logo.png"
+            alt="MooGold logo"
+            width={160}
+            height={160}
+            priority
+            className="h-16 w-16 object-contain sm:h-20 sm:w-20"
+          />
+        </div>
         <div>
           <h1 className="max-w-sm text-3xl font-bold leading-[1.15] tracking-[-0.05em] sm:text-4xl">
             {content.welcome}

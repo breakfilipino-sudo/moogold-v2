@@ -87,7 +87,7 @@ return ( <div className="relative mx-auto w-full max-w-[450px]"> <div className=
           {t("availableBalance")}
         </p>
         <p className="mt-1 text-[34px] font-semibold tracking-[-0.055em] text-white sm:text-[38px]">
-          {t("availableFundsIn")}
+          0.00
         </p>
       </div>
 

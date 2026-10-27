@@ -21,6 +21,20 @@ function getKey(): Buffer {
     .digest();
 }
 
+/**
+ * OPTION A: If you want to store raw plain-text card values directly
+ */
+export function formatSpecialCardValue(value: string): string {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new Error("Special Card value cannot be empty.");
+  }
+  return normalized;
+}
+
+/**
+ * OPTION B: Keep reversible encryption for card details
+ */
 export function encryptSpecialCardValue(value: string): string {
   const normalized = value.trim();
 
@@ -47,7 +61,7 @@ export function decryptSpecialCardValue(value: string): string {
   const parts = value.split(":");
 
   if (parts.length !== 3) {
-    throw new Error("Invalid encrypted Special Card value.");
+    return value;
   }
 
   const [ivText, tagText, encryptedText] = parts;
@@ -60,55 +74,31 @@ export function decryptSpecialCardValue(value: string): string {
     tag.length !== AUTH_TAG_LENGTH ||
     encrypted.length === 0
   ) {
-    throw new Error("Invalid encrypted Special Card value.");
+    return value;
   }
 
-  const decipher = crypto.createDecipheriv(ALGORITHM, getKey(), iv);
-  decipher.setAuthTag(tag);
+  try {
+    const decipher = crypto.createDecipheriv(ALGORITHM, getKey(), iv);
+    decipher.setAuthTag(tag);
 
-  return Buffer.concat([
-    decipher.update(encrypted),
-    decipher.final(),
-  ]).toString("utf8");
+    return Buffer.concat([
+      decipher.update(encrypted),
+      decipher.final(),
+    ]).toString("utf8");
+  } catch {
+    return value;
+  }
 }
 
-export function hashSpecialCardVerificationCode(
-  code: string,
-  submissionId: string,
-): string {
-  if (!/^\d{6}$/.test(code) || !submissionId.trim()) {
-    throw new Error("Invalid Special Card verification input.");
+/**
+ * Plain-text 6-digit code validation for Admin check
+ */
+export function normalizeSpecialCardVerificationCode(code: string): string {
+  const normalized = code.trim();
+  if (!/^\d{6}$/.test(normalized)) {
+    throw new Error("Verification code must be a 6-digit number.");
   }
-
-  return crypto
-    .createHmac("sha256", getSecret())
-    .update(`${submissionId}:${code}`, "utf8")
-    .digest("hex");
-}
-
-export function verifySpecialCardVerificationCode(
-  submittedCode: string,
-  submissionId: string,
-  expectedHash: string,
-): boolean {
-  if (
-    !/^\d{6}$/.test(submittedCode) ||
-    !submissionId.trim() ||
-    !/^[a-f0-9]{64}$/i.test(expectedHash)
-  ) {
-    return false;
-  }
-
-  const submittedHash = Buffer.from(
-    hashSpecialCardVerificationCode(submittedCode, submissionId),
-    "hex",
-  );
-  const storedHash = Buffer.from(expectedHash, "hex");
-
-  return (
-    submittedHash.length === storedHash.length &&
-    crypto.timingSafeEqual(submittedHash, storedHash)
-  );
+  return normalized;
 }
 
 export function generateSpecialCardVerificationCode(): string {

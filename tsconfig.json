@@ -40,7 +40,10 @@
                     ".next/dev/types/**/*.ts"
                 ],
     "exclude":  [
+                    "prisma/review-drafts/**",
                     "node_modules",
-                    "recovery-backup-20261009"
-                , "backups"]
+                    "recovery-backup-20261009",
+                    "backups",
+                    "tools/postgresql-17"
+                ]
 }

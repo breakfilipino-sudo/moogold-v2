@@ -102,6 +102,12 @@ export async function requestReferralWithdrawal(
     );
   }
 
+  if (amount < 100) {
+    throw new Error(
+      "The minimum referral withdrawal amount is $100.00.",
+    );
+  }
+
   const bankName = getRequiredValue(
     formData,
     "bankName",

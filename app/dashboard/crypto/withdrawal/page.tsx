@@ -87,6 +87,7 @@ export default async function CryptoWithdrawalPage() {
         asset: true,
         network: true,
         balance: true,
+        reservedBalance: true,
       },
       orderBy: {
         asset: "asc",
@@ -160,7 +161,7 @@ export default async function CryptoWithdrawalPage() {
           id: balance.id,
           asset: balance.asset,
           network: balance.network,
-          balance: balance.balance.toString(),
+          balance: balance.balance.sub(balance.reservedBalance).toString(),
         }))}
         withdrawalHistory={withdrawalHistory.map((withdrawal) => ({
           id: withdrawal.id,

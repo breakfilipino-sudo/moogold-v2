@@ -126,11 +126,6 @@ export async function requestWithdrawal(
     );
   }
 
-  if (amount < 10) {
-    throw new Error(
-      "The minimum withdrawal amount is $10.00.",
-    );
-  }
 
   /*
    * ---------------------------------------------------------

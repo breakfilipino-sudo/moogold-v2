@@ -12,7 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Bell, X } from "lucide-react";
 
-import { getNotificationSummary } from "@/app/dashboard/notifications/actions";
+import { getRecentNotificationUpdates } from "@/app/dashboard/notifications/actions";
 
 interface DashboardContextType {
   sidebarOpen: boolean;
@@ -74,16 +74,16 @@ export function DashboardProvider({
       checkingNotifications.current = true;
 
       try {
-        const summary = await getNotificationSummary();
+        const notifications = await getRecentNotificationUpdates();
         const currentIds = new Set(
-          summary.notifications.map((item) => item.id),
+          notifications.map((item) => item.id),
         );
 
         if (!hasInitialNotificationSnapshot.current) {
           knownNotificationIds.current = currentIds;
           hasInitialNotificationSnapshot.current = true;
         } else {
-          const newNotifications = summary.notifications.filter(
+          const newNotifications = notifications.filter(
             (item) => !knownNotificationIds.current.has(item.id),
           );
 
@@ -142,15 +142,15 @@ export function DashboardProvider({
   useEffect(() => {
     const initialCheck = window.setTimeout(() => {
       void checkForUpdates(false);
-    }, 1000);
+    }, 10000);
 
     const interval = window.setInterval(() => {
-      void checkForUpdates(true);
-    }, 15000);
+      void checkForUpdates(false);
+    }, 60000);
 
     function handleVisibilityChange() {
       if (document.visibilityState === "visible") {
-        void checkForUpdates(true);
+        void checkForUpdates(false);
       }
     }
 

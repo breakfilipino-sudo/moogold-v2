@@ -8,7 +8,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
 import { getGoldMarketData } from "@/lib/markets/gold";
 
@@ -21,20 +21,12 @@ const money = (value: number) =>
   }).format(value);
 
 export default async function GoldPage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser();
-
-  if (!authUser) {
-    redirect("/login");
-  }
+  const { user: currentUser } = await getCurrentUser();
 
   const [user, gold] = await Promise.all([
     prisma.user.findUnique({
       where: {
-        authUserId: authUser.id,
+        id: currentUser.id,
       },
       include: {
         wallet: true,
@@ -60,7 +52,6 @@ export default async function GoldPage() {
 
   return (
     <div className="space-y-4 pb-8">
-      {/* Header */}
       <div className="flex items-center border-b border-slate-200 pb-4">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
@@ -79,9 +70,7 @@ export default async function GoldPage() {
         </div>
       </div>
 
-      {/* Mobile: Your gold + trading come first */}
       <section className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
-        {/* Your gold */}
         <div className="rounded-xl border border-slate-200 bg-white">
           <SectionHeader title="Your gold" />
 
@@ -129,7 +118,6 @@ export default async function GoldPage() {
           </div>
         </div>
 
-        {/* Gold trading */}
         <div className="rounded-xl border border-slate-200 bg-white">
           <SectionHeader title="Gold trading" />
 
@@ -152,7 +140,6 @@ export default async function GoldPage() {
         </div>
       </section>
 
-      {/* Gold price / market summary */}
       <section className="rounded-xl border border-slate-200 bg-white">
         <div className="flex flex-col divide-y divide-slate-100 sm:flex-row sm:divide-x sm:divide-y-0">
           <MarketItem
@@ -260,9 +247,7 @@ function InfoRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-4 py-2">
-      <span className="text-xs text-slate-500">
-        {label}
-      </span>
+      <span className="text-xs text-slate-500">{label}</span>
 
       <span className="text-xs font-medium text-slate-800">
         {value}

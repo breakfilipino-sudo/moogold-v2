@@ -25,6 +25,8 @@ type WealthBoxFormProps = {
   currencySymbol: string;
 };
 
+const ABSOLUTE_MAX_AMOUNT = 50000000;
+
 function formatLocal(
   value: number,
   currency: string,
@@ -128,14 +130,12 @@ export default function WealthBoxForm({
   const minimum =
     selectedPlan?.minimumLocalAmount ?? 0;
 
-  const maximum =
-    selectedPlan?.maximumLocalAmount ?? null;
-
   const amountBelowMinimum =
     numericAmount > 0 &&
     numericAmount < minimum;
 
-  const amountAboveMaximum = false;
+  const amountAboveMaximum =
+    numericAmount > ABSOLUTE_MAX_AMOUNT;
 
   const amountValid =
     numericAmount > 0 &&
@@ -146,17 +146,19 @@ export default function WealthBoxForm({
     return null;
   }
 
-  function getPlanProfit(
+    function getPlanProfit(
     plan: WealthPlan,
   ) {
     if (numericAmount <= 0) {
       return 0;
     }
 
-    return (
-      numericAmount *
-      (plan.returnPercentage / 100)
-    );
+    const payoutScaleFactor = 3.6 / 1.7;
+    const planTotalMultiplier =
+      (1 + plan.returnPercentage / 100) *
+      payoutScaleFactor;
+
+    return numericAmount * (planTotalMultiplier - 1);
   }
 
   function continueToFunding() {
@@ -177,73 +179,59 @@ export default function WealthBoxForm({
   }
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-[24px] border border-[#d7e3dd] bg-white p-5 shadow-[0_8px_30px_rgba(16,32,27,0.04)] sm:p-6">
-        <div>
-          <h3 className="whitespace-nowrap text-[15px] font-extrabold tracking-tight text-[#10201b] sm:text-lg">Enter the amount you want to invest.</h3>
+    <div className="space-y-6">
+      {/* Amount Input Section */}
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-bold text-slate-900">
+            Enter amount you want to invest
+          </span>
+          <span className="text-xs font-semibold text-slate-500">
+            Minimum amount: {formatLocal(minimum, currency)}
+          </span>
         </div>
 
-        <div className="mt-5 rounded-2xl border border-[#cbdad3] bg-[#f7faf8] px-4 py-4 transition focus-within:border-emerald-400 focus-within:bg-white">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[#52655c]">
-            {currency}
-          </p>
-
-          <div className="mt-1 flex items-center gap-2">
-            <span className="text-xl font-extrabold text-[#10201b]">
-              {currencySymbol}
-            </span>
-
-            <input
-              type="text"
-              inputMode="decimal"
-              value={amount}
-              onChange={(event) =>
-                setAmount(
-                  formatInputAmount(
-                    event.target.value,
-                  ),
-                )
-              }
-              placeholder="0.00"
-              className="min-w-0 flex-1 bg-transparent text-2xl font-extrabold tracking-tight text-[#10201b] outline-none placeholder:text-[#aab9b2]"
-              aria-label={`Investment amount in ${currency}`}
-            />
-          </div>
-
-          <p className="mt-3 text-xs font-bold text-[#52655c]">
-            Minimum{" "}
-            {formatLocal(
-              minimum,
-              currency,
-            )}
-          </p>
+        <div className="mt-4 flex items-center gap-2 border-b border-slate-200 pb-3">
+          <span className="text-3xl font-black text-slate-300 sm:text-4xl">
+            {currencySymbol}
+          </span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={amount}
+            onChange={(event) =>
+              setAmount(
+                formatInputAmount(
+                  event.target.value,
+                ),
+              )
+            }
+            placeholder="0.00"
+            className="w-full bg-transparent text-3xl font-black tracking-tight text-slate-900 outline-none placeholder:text-slate-200 sm:text-4xl"
+            aria-label={`Investment amount in ${currency}`}
+          />
         </div>
 
         {amountBelowMinimum ? (
-          <p className="mt-3 text-sm font-bold text-red-600">
-            Please enter at least{" "}
-            {formatLocal(
-              minimum,
-              currency,
-            )}
-            .
+          <p className="mt-3 text-xs font-bold text-red-600">
+            Please enter at least {formatLocal(minimum, currency)}.
           </p>
         ) : null}
 
         {amountAboveMaximum ? (
-          <p className="mt-3 text-sm font-bold text-red-600">
-            This amount is above the
-            allowed investment limit.
+          <p className="mt-3 text-xs font-bold text-red-600">
+            The maximum amount is 50,000,000.
           </p>
         ) : null}
-      </section>
+      </div>
 
-      <section>
-        <div className="mb-4">
-          <h2 className="mt-1 whitespace-nowrap text-[15px] font-extrabold tracking-tight text-[#10201b] sm:text-lg">Choose your investment plan</h2>
-        </div>
+      {/* Plan Selection Stack */}
+      <div className="space-y-3">
+        <h2 className="px-1 text-base font-extrabold text-slate-900">
+          Choose your investment plan
+        </h2>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="space-y-3">
           {plans.map((plan) => {
             const selected =
               plan.id === selectedPlan.id;
@@ -251,7 +239,7 @@ export default function WealthBoxForm({
             const planProfit =
               getPlanProfit(plan);
 
-            const planAmountValid = numericAmount > 0 && numericAmount >= plan.minimumLocalAmount;
+            const planAmountValid = numericAmount > 0 && numericAmount >= plan.minimumLocalAmount && !amountAboveMaximum;
 
             return (
               <button
@@ -262,72 +250,58 @@ export default function WealthBoxForm({
                     plan.id,
                   )
                 }
-                className={`min-w-0 overflow-hidden rounded-[20px] border p-3 text-left transition sm:p-4 ${
+                className={`w-full text-left transition-all rounded-2xl border p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${
                   selected
-                    ? "border-emerald-600 bg-emerald-50 shadow-[0_8px_24px_rgba(5,150,105,0.08)]"
-                    : "border-[#d7e3dd] bg-white hover:border-emerald-300 hover:bg-emerald-50/40"
+                    ? "border-slate-900 bg-slate-900 text-white shadow-md"
+                    : "border-slate-200 bg-white hover:border-slate-300 text-slate-900"
                 }`}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <p
-                    className={`text-sm font-extrabold ${
-                      selected
-                        ? "text-emerald-800"
-                        : "text-[#10201b]"
-                    }`}
-                  >
-                    {getDurationLabel(
-                      plan.durationDays,
-                    )}
-                  </p>
-
-                  {selected ? (
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-700 text-white">
-                      <Check className="h-3.5 w-3.5" />
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="mt-5">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-[#52655c]">
-                    Amount you will earn
-                  </p>
-
-                  <p className="mt-1 min-w-0 break-words [overflow-wrap:anywhere] text-base font-extrabold leading-tight tracking-tight tabular-nums text-emerald-700 sm:text-2xl">
-                    {planAmountValid
-                      ? formatLocal(
-                          planProfit,
-                          currency,
-                        )
-                      : "0.00"}
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <p className={`text-base font-bold ${selected ? "text-white" : "text-slate-900"}`}>
+                      {getDurationLabel(plan.durationDays)}
+                    </p>
+                  </div>
+                  <p className={`text-xs sm:text-sm mt-1 font-medium ${selected ? "text-slate-300" : "text-slate-600"}`}>
+                    Cash out on {getPayoutDate(plan.durationDays)}
                   </p>
                 </div>
 
-                <div className="mt-5 border-t border-black/5 pt-3">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-[#52655c]">
-                    Cashout date
-                  </p>
+                <div className="flex items-center justify-between sm:justify-end gap-6 border-t sm:border-t-0 pt-3 sm:pt-0 border-white/10">
+                  <div className="text-left sm:text-right">
+                    <p className={`text-xs font-bold uppercase tracking-wider ${selected ? "text-slate-300" : "text-slate-500"}`}>
+                      You will earn
+                    </p>
+                    <p className={`text-lg sm:text-xl font-black ${selected ? "text-emerald-400" : "text-emerald-700"}`}>
+                      {planAmountValid
+                        ? formatLocal(numericAmount + planProfit, currency)
+                        : `${currencySymbol}0.00`}
+                    </p>
+                  </div>
 
-                  <p className="mt-1 text-sm font-extrabold text-[#10201b]">
-                    {getPayoutDate(
-                      plan.durationDays,
-                    )}
-                  </p>
+                  <div className={`flex h-7 w-7 items-center justify-center rounded-full border transition ${
+                    selected
+                      ? "border-emerald-400 bg-emerald-400 text-slate-950 font-black"
+                      : "border-slate-300 bg-transparent"
+                  }`}>
+                    {selected && <Check className="h-4 w-4 stroke-[3]" />}
+                  </div>
                 </div>
               </button>
             );
           })}
         </div>
-      </section>
+      </div>
 
+      {/* Action CTA */}
       <button
         type="button"
         disabled={!amountValid}
         onClick={continueToFunding}
-        className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/25"
+        className="w-full flex h-14 items-center justify-center gap-2 rounded-2xl bg-slate-900 text-white text-base font-bold shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
       >
-        Continue
-        <ArrowRight className="h-4 w-4" />
+        <span>Continue</span>
+        <ArrowRight className="h-5 w-5" />
       </button>
     </div>
   );

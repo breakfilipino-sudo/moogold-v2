@@ -6,6 +6,12 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 
+function isTransactionConflict(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2034"
+  );
+}
 async function getAdminUser() {
   const supabase = await createClient();
 
@@ -146,48 +152,58 @@ export async function approveCryptoWithdrawal(
         const totalAmount =
           withdrawal.totalAmount;
 
-        if (
-          balanceBefore.lt(
-            totalAmount,
-          )
-        ) {
-          throw new Error(
-            "INSUFFICIENT_CRYPTO_BALANCE",
-          );
+        if (balanceBefore.lt(totalAmount)) {
+          throw new Error("INSUFFICIENT_CRYPTO_BALANCE");
         }
 
-        const balanceAfter =
-          balanceBefore.sub(
-            totalAmount,
-          );
+        if (cryptoBalance.reservedBalance.lt(totalAmount)) {
+          throw new Error("CRYPTO_RESERVATION_MISSING");
+        }
 
-        const updatedWithdrawal =
-          await tx.cryptoWithdrawal.update({
-            where: {
-              id: withdrawal.id,
-            },
-            data: {
-              status: "COMPLETED",
-              reviewedById: admin.id,
-              reviewedAt: new Date(),
-            },
-          });
+        const balanceAfter = balanceBefore.sub(totalAmount);
+        const reservedBalanceAfter =
+          cryptoBalance.reservedBalance.sub(totalAmount);
 
-        await tx.cryptoBalance.update({
+        const withdrawalClaim = await tx.cryptoWithdrawal.updateMany({
+          where: {
+            id: withdrawal.id,
+            status: {
+              in: ["PENDING", "PROCESSING"],
+            },
+          },
+          data: {
+            status: "COMPLETED",
+            reviewedById: admin.id,
+            reviewedAt: new Date(),
+          },
+        });
+
+        if (withdrawalClaim.count !== 1) {
+          throw new Error("WITHDRAWAL_ALREADY_REVIEWED");
+        }
+
+        const balanceUpdate = await tx.cryptoBalance.updateMany({
           where: {
             id: cryptoBalance.id,
+            balance: balanceBefore,
+            reservedBalance: cryptoBalance.reservedBalance,
           },
           data: {
             balance: balanceAfter,
+            reservedBalance: reservedBalanceAfter,
           },
         });
+
+        if (balanceUpdate.count !== 1) {
+          throw new Error("CRYPTO_RESERVATION_CONFLICT");
+        }
 
         await tx.cryptoLedgerEntry.create({
           data: {
             cryptoBalanceId:
               cryptoBalance.id,
             withdrawalId:
-              updatedWithdrawal.id,
+              withdrawal.id,
             asset:
               withdrawal.asset,
             network:
@@ -272,6 +288,13 @@ export async function approveCryptoWithdrawal(
       error,
     );
 
+    if (isTransactionConflict(error)) {
+      return {
+        success: false,
+        error: "This withdrawal conflicted with another transaction. Refresh the withdrawal and balance, then try again.",
+      };
+    }
+
     if (
       error instanceof Error &&
       error.message ===
@@ -341,6 +364,26 @@ export async function approveCryptoWithdrawal(
         success: false,
         error:
           "The user does not have enough crypto balance to approve this withdrawal.",
+      };
+    }
+
+    if (
+      error instanceof Error &&
+      error.message === "CRYPTO_RESERVATION_MISSING"
+    ) {
+      return {
+        success: false,
+        error: "The reserved funds for this withdrawal could not be verified. Do not approve it; investigate the balance and pending withdrawals first.",
+      };
+    }
+
+    if (
+      error instanceof Error &&
+      error.message === "CRYPTO_RESERVATION_CONFLICT"
+    ) {
+      return {
+        success: false,
+        error: "The reservation changed during review. Refresh the withdrawal and try again.",
       };
     }
 
@@ -428,18 +471,60 @@ export async function rejectCryptoWithdrawal(
           );
         }
 
-        await tx.cryptoWithdrawal.update({
+        const cryptoBalance = await tx.cryptoBalance.findUnique({
+          where: { id: withdrawal.cryptoBalanceId },
+        });
+
+        if (!cryptoBalance) {
+          throw new Error("CRYPTO_BALANCE_NOT_FOUND");
+        }
+
+        if (
+          cryptoBalance.userId !== withdrawal.userId ||
+          cryptoBalance.asset !== withdrawal.asset ||
+          cryptoBalance.network !== withdrawal.network
+        ) {
+          throw new Error("CRYPTO_BALANCE_MISMATCH");
+        }
+
+        if (cryptoBalance.reservedBalance.lt(withdrawal.totalAmount)) {
+          throw new Error("CRYPTO_RESERVATION_MISSING");
+        }
+
+        const reservationRelease = await tx.cryptoBalance.updateMany({
+          where: {
+            id: cryptoBalance.id,
+            reservedBalance: cryptoBalance.reservedBalance,
+          },
+          data: {
+            reservedBalance: cryptoBalance.reservedBalance.sub(
+              withdrawal.totalAmount,
+            ),
+          },
+        });
+
+        if (reservationRelease.count !== 1) {
+          throw new Error("CRYPTO_RESERVATION_CONFLICT");
+        }
+
+        const withdrawalClaim = await tx.cryptoWithdrawal.updateMany({
           where: {
             id: withdrawal.id,
+            status: {
+              in: ["PENDING", "PROCESSING"],
+            },
           },
           data: {
             status: "REJECTED",
-            rejectionReason:
-              reason,
+            rejectionReason: reason,
             reviewedById: admin.id,
             reviewedAt: new Date(),
           },
         });
+
+        if (withdrawalClaim.count !== 1) {
+          throw new Error("WITHDRAWAL_ALREADY_REVIEWED");
+        }
 
         await tx.notification.create({
           data: {
@@ -480,6 +565,13 @@ export async function rejectCryptoWithdrawal(
       error,
     );
 
+    if (isTransactionConflict(error)) {
+      return {
+        success: false,
+        error: "This withdrawal conflicted with another transaction. Refresh the withdrawal and balance, then try again.",
+      };
+    }
+
     if (
       error instanceof Error &&
       error.message ===
@@ -513,6 +605,26 @@ export async function rejectCryptoWithdrawal(
         success: false,
         error:
           "This withdrawal has already been debited and cannot be rejected.",
+      };
+    }
+
+    if (
+      error instanceof Error &&
+      error.message === "CRYPTO_RESERVATION_MISSING"
+    ) {
+      return {
+        success: false,
+        error: "The reserved funds for this withdrawal could not be verified. Review the balance and pending withdrawals before taking further action.",
+      };
+    }
+
+    if (
+      error instanceof Error &&
+      error.message === "CRYPTO_RESERVATION_CONFLICT"
+    ) {
+      return {
+        success: false,
+        error: "The reservation changed during review. Refresh the withdrawal and try again.",
       };
     }
 

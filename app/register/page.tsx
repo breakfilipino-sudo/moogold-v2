@@ -62,9 +62,19 @@ export default function RegisterPage() {
       return;
     }
 
-    const fullName = String(
-      formData.get("fullName") ?? "",
+    const firstName = String(
+      formData.get("firstName") ?? "",
     ).trim();
+
+    const lastName = String(
+      formData.get("lastName") ?? "",
+    ).trim();
+
+    const fullName = [firstName, lastName].filter(Boolean).join(" ");
+
+    const email = String(
+      formData.get("email") ?? "",
+    ).trim().toLowerCase();
 
     const phone = String(
       formData.get("phone") ?? "",
@@ -73,11 +83,16 @@ export default function RegisterPage() {
       .trim();
 
     if (!fullName) {
-  setError(t("registrationNameError"));
-  return;
-}
+      setError(t("registrationNameError"));
+      return;
+    }
 
-if (!day || !month || !year) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("Enter a valid email address.");
+      return;
+    }
+
+    if (!day || !month || !year) {
   setError(t("registrationDobError"));
   return;
 }
@@ -96,7 +111,10 @@ if (!phone) {
     const dateOfBirth =
       `${year}-${monthNumber}-${dayNumber}`;
 
+    formData.set("firstName", firstName);
+    formData.set("lastName", lastName);
     formData.set("fullName", fullName);
+    formData.set("email", email);
     formData.set("dateOfBirth", dateOfBirth);
     formData.set(
       "phone",
@@ -118,11 +136,11 @@ if (!phone) {
         return;
       }
 
-      if (result?.success && result.phone) {
+      if (result?.success && result.phone && result.email) {
         router.push(
           `/register/verify?phone=${encodeURIComponent(
             result.phone,
-          )}`,
+          )}&email=${encodeURIComponent(result.email)}`,
         );
       }
     } catch (submitError) {
@@ -225,22 +243,41 @@ if (!phone) {
                   </div>
                 )}
 
-                <div>
-                  <label
-                    htmlFor="fullName"
-                    className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#52605a]"
-                  >
-                    Full legal name
-                  </label>
-
-                  <input
-                    id="fullName"
-                    name="fullName"
-                    required
-                    autoComplete="name"
-                    placeholder="Name as shown on your ID"
-                    className="h-11 w-full rounded-xl border border-[#d6dfda] bg-white px-3.5 text-[13px] font-medium text-[#17231e] outline-none transition placeholder:text-[#a4ada8] focus:border-[#138a5d] focus:shadow-[0_0_0_3px_rgba(19,138,93,.08)]"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="min-w-0">
+                    <label
+                      htmlFor="firstName"
+                      className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#52605a]"
+                    >
+                      First name
+                    </label>
+                    <input
+                      id="firstName"
+                      name="firstName"
+                      required
+                      autoComplete="given-name"
+                      maxLength={80}
+                      placeholder="First name"
+                      className="h-11 w-full min-w-0 rounded-xl border border-[#d6dfda] bg-white px-3 text-[13px] font-medium text-[#17231e] outline-none transition placeholder:text-[#a4ada8] focus:border-[#138a5d] focus:shadow-[0_0_0_3px_rgba(19,138,93,.08)]"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <label
+                      htmlFor="lastName"
+                      className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#52605a]"
+                    >
+                      Last name
+                    </label>
+                    <input
+                      id="lastName"
+                      name="lastName"
+                      required
+                      autoComplete="family-name"
+                      maxLength={80}
+                      placeholder="Last name"
+                      className="h-11 w-full min-w-0 rounded-xl border border-[#d6dfda] bg-white px-3 text-[13px] font-medium text-[#17231e] outline-none transition placeholder:text-[#a4ada8] focus:border-[#138a5d] focus:shadow-[0_0_0_3px_rgba(19,138,93,.08)]"
+                    />
+                  </div>
                 </div>
 
                 <div className="mt-3.5">
@@ -334,9 +371,13 @@ if (!phone) {
                       }
                       className="flex h-11 w-full items-center rounded-xl border border-[#d6dfda] bg-white px-3 text-left outline-none transition hover:border-[#c4d0c9] focus:border-[#138a5d] sm:px-3.5"
                     >
-                      <span className="mr-2.5 shrink-0 text-base">
-                        {selectedCountry.flag}
-                      </span>
+                      <img
+                        src={`https://flagcdn.com/w40/${selectedCountry.code.toLowerCase()}.png`}
+                        alt={`${selectedCountry.name} flag`}
+                        width={24}
+                        height={18}
+                        className="mr-2.5 h-[18px] w-6 shrink-0 rounded-[2px] object-cover"
+                      />
 
                       <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#17231e]">
                         {selectedCountry.name}
@@ -376,9 +417,13 @@ if (!phone) {
                                     : "text-[#52605a] hover:bg-[#f5f8f6]"
                                 }`}
                               >
-                                <span className="mr-2.5 shrink-0 text-base">
-                                  {country.flag}
-                                </span>
+                                <img
+                                  src={`https://flagcdn.com/w40/${country.code.toLowerCase()}.png`}
+                                  alt=""
+                                  width={24}
+                                  height={18}
+                                  className="mr-2.5 h-[18px] w-6 shrink-0 rounded-[2px] object-cover"
+                                />
 
                                 <span className="min-w-0 flex-1 truncate text-[12px] font-medium">
                                   {country.name}
@@ -398,10 +443,29 @@ if (!phone) {
 
                 <div className="mt-3.5">
                   <label
+                    htmlFor="email"
+                    className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#52605a]"
+                  >
+                    Email address
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    inputMode="email"
+                    placeholder="Enter your email address"
+                    className="h-11 w-full rounded-xl border border-[#d6dfda] bg-white px-3 text-[13px] font-medium text-[#17231e] outline-none transition placeholder:text-[#a4ada8] focus:border-[#138a5d] focus:shadow-[0_0_0_3px_rgba(19,138,93,.08)]"
+                  />
+                </div>
+
+                <div className="mt-3.5">
+                  <label
                     htmlFor="phone"
                     className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#52605a]"
                   >
-                    Mobile number
+                    Enter your phone number
                   </label>
 
                   <div className="flex min-w-0 overflow-hidden rounded-xl border border-[#d6dfda] bg-white transition focus-within:border-[#138a5d] focus-within:shadow-[0_0_0_3px_rgba(19,138,93,.08)]">
@@ -418,14 +482,13 @@ if (!phone) {
                       required
                       inputMode="numeric"
                       autoComplete="tel-national"
-                      placeholder="Mobile number"
+                      placeholder="Enter your phone number"
                       className="min-w-0 flex-1 bg-transparent px-3 text-[13px] font-medium text-[#17231e] outline-none placeholder:text-[#a4ada8]"
                     />
                   </div>
 
                   <p className="mt-1.5 text-[11px] leading-4 text-[#89958f]">
-                    Your number will be used to
-                    verify your account.
+                    Your phone number will be linked to your account. We will send your verification code by email.
                   </p>
                 </div>
 

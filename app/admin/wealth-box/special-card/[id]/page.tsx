@@ -1,21 +1,25 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   ArrowLeft,
   CalendarDays,
   CheckCircle2,
   Clock3,
+  CreditCard,
   UserRound,
   Wallet,
 } from "lucide-react";
+
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
-import { SpecialCardAdminControls } from "./special-card-admin-controls";
+import { decryptSpecialCardValue } from "@/lib/helpers/special-card-security";
+import SpecialCardAdminControls from "./special-card-admin-controls";
 
 export const dynamic = "force-dynamic";
 
 function formatMoney(value: unknown, currency: string) {
   const amount = Number(value);
+
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: /^[A-Z]{3}$/.test(currency) ? currency : "USD",
@@ -25,7 +29,8 @@ function formatMoney(value: unknown, currency: string) {
 }
 
 function formatDate(value: Date | null | undefined) {
-  if (!value) return "â€”";
+  if (!value) return "—";
+
   return new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -36,12 +41,23 @@ function statusLabel(status: string) {
   return status.replaceAll("_", " ");
 }
 
+function decryptSafely(value: string | null | undefined) {
+  if (!value?.trim()) return null;
+
+  try {
+    return decryptSpecialCardValue(value);
+  } catch {
+    return value;
+  }
+}
+
 export default async function SpecialCardReviewPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const supabase = await createClient();
+
   const {
     data: { user: authUser },
   } = await supabase.auth.getUser();
@@ -79,6 +95,10 @@ export default async function SpecialCardReviewPage({
       rejectionReason: true,
       createdAt: true,
       updatedAt: true,
+      cardNumberEncrypted: true,
+      membershipNumberEncrypted: true,
+      expirationDate: true,
+      verificationCodeHash: true,
       user: {
         select: {
           fullName: true,
@@ -114,6 +134,19 @@ export default async function SpecialCardReviewPage({
     submission.user.email ||
     "Customer";
 
+  const cardNumber = decryptSafely(submission.cardNumberEncrypted);
+  const membershipNumber = decryptSafely(submission.membershipNumberEncrypted);
+
+  const rawRecord = submission as Record<string, unknown>;
+const rawCode =
+  (typeof rawRecord.verificationCode === "string" && rawRecord.verificationCode) ||
+  (typeof rawRecord.code === "string" && rawRecord.code) ||
+  (typeof rawRecord.verificationCodeHash === "string" && rawRecord.verificationCodeHash) ||
+  null;
+
+// Attempt to decrypt if encrypted, or return raw string
+const codeValue = decryptSafely(rawCode) || rawCode;
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -127,17 +160,20 @@ export default async function SpecialCardReviewPage({
 
         <header className="rounded-3xl bg-slate-950 p-6 text-white sm:p-8">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-300">
-            Wealth Box Â· Admin review
+            Wealth Box · Admin review
           </p>
+
           <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1 className="text-2xl font-black sm:text-3xl">
                 Special Card submission
               </h1>
+
               <p className="mt-2 break-all text-sm text-slate-300">
                 Reference: {submission.id}
               </p>
             </div>
+
             <span className="inline-flex w-fit rounded-full bg-white/10 px-3 py-2 text-xs font-black uppercase tracking-wide">
               {statusLabel(submission.status)}
             </span>
@@ -150,6 +186,7 @@ export default async function SpecialCardReviewPage({
               <span className="rounded-2xl bg-slate-100 p-3">
                 <UserRound className="h-5 w-5 text-slate-700" />
               </span>
+
               <h2 className="text-lg font-black text-slate-900">
                 Customer details
               </h2>
@@ -162,12 +199,14 @@ export default async function SpecialCardReviewPage({
                   {customerName}
                 </dd>
               </div>
+
               <div>
                 <dt className="text-slate-500">Email</dt>
                 <dd className="mt-1 break-all font-semibold text-slate-900">
                   {submission.user.email || "Not provided"}
                 </dd>
               </div>
+
               <div>
                 <dt className="text-slate-500">Registered phone</dt>
                 <dd className="mt-1 font-semibold text-slate-900">
@@ -175,12 +214,61 @@ export default async function SpecialCardReviewPage({
                 </dd>
               </div>
             </dl>
-            <p className="mt-5 rounded-2xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">
-              Verification codes are delivered manually outside MooGold.
-              Customer-entered digits are never displayed in this review.
-              Never request the customer to send their card number through
-              email or chat.
-            </p>
+
+            <div className="mt-6 border-t border-slate-100 pt-5">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-800">
+                <CreditCard className="h-4 w-4" />
+                Submitted Card Information
+              </div>
+
+              <div className="mt-3 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">
+                    Special Card Number
+                  </p>
+
+                  <p className="mt-1 break-all font-mono text-sm font-bold text-slate-950">
+                    {cardNumber || "Unavailable"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">
+                    Membership Number
+                  </p>
+
+                  <p className="mt-1 break-all font-mono text-sm font-bold text-slate-950">
+                    {membershipNumber || "Unavailable"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">
+                    Expiration Date
+                  </p>
+
+                  <p className="mt-1 text-sm font-semibold text-slate-950">
+                    {submission.expirationDate || "Not provided"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">
+                    Six-Digit Verification Status
+                  </p>
+
+                  <p className="mt-1 text-sm font-semibold text-slate-700">
+                    {submission.verifiedAt
+                      ? "Verification approved"
+                      : submission.status === "REJECTED"
+                        ? "Verification rejected"
+                        : submission.status === "EXPIRED"
+                          ? "Verification expired"
+                          : "Awaiting admin review"}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -188,6 +276,7 @@ export default async function SpecialCardReviewPage({
               <span className="rounded-2xl bg-emerald-50 p-3">
                 <Wallet className="h-5 w-5 text-emerald-700" />
               </span>
+
               <h2 className="text-lg font-black text-slate-900">
                 Funding summary
               </h2>
@@ -200,6 +289,7 @@ export default async function SpecialCardReviewPage({
                   {submission.plan.name}
                 </dd>
               </div>
+
               <div>
                 <dt className="text-slate-500">Submitted amount</dt>
                 <dd className="mt-1 text-xl font-black text-slate-950">
@@ -209,23 +299,29 @@ export default async function SpecialCardReviewPage({
                   )}
                 </dd>
                 <dd className="mt-1 text-slate-500">
-                  USD equivalent: {formatMoney(submission.principalUsd, "USD")}
+                  USD equivalent:{" "}
+                  {formatMoney(submission.principalUsd, "USD")}
                 </dd>
               </div>
+
               <div>
                 <dt className="text-slate-500">Duration</dt>
                 <dd className="mt-1 font-bold text-slate-900">
                   {submission.plan.durationDays} days
                 </dd>
               </div>
+
               <div>
                 <dt className="text-slate-500">Projected profit (USD)</dt>
                 <dd className="mt-1 font-bold text-slate-900">
                   {formatMoney(submission.projectedProfitUsd, "USD")}
                 </dd>
               </div>
+
               <div>
-                <dt className="text-slate-500">Projected maturity amount (USD)</dt>
+                <dt className="text-slate-500">
+                  Projected maturity amount (USD)
+                </dt>
                 <dd className="mt-1 font-bold text-slate-900">
                   {formatMoney(submission.maturityAmountUsd, "USD")}
                 </dd>
@@ -237,10 +333,12 @@ export default async function SpecialCardReviewPage({
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <CalendarDays className="h-5 w-5 text-slate-600" />
+
             <h2 className="text-lg font-black text-slate-900">
               Submission history
             </h2>
           </div>
+
           <div className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
             <div>
               <p className="text-slate-500">Submitted</p>
@@ -248,49 +346,75 @@ export default async function SpecialCardReviewPage({
                 {formatDate(submission.createdAt)}
               </p>
             </div>
+
             <div>
               <p className="text-slate-500">Last updated</p>
               <p className="mt-1 font-semibold text-slate-900">
                 {formatDate(submission.updatedAt)}
               </p>
             </div>
+
             <div>
               <p className="text-slate-500">Attempts submitted</p>
               <p className="mt-1 font-semibold text-slate-900">
                 {submission.failedAttempts} of 5
               </p>
             </div>
+
             <div>
               <p className="text-slate-500">Last customer attempt</p>
               <p className="mt-1 font-semibold text-slate-900">
                 {formatDate(submission.lastCodeRequestAt)}
               </p>
             </div>
+
+            <div>
+              <p className="text-slate-500">Verification code issued</p>
+              <p className="mt-1 font-semibold text-slate-900">
+                {formatDate(submission.verificationCodeIssuedAt)}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-slate-500">Verification code expires</p>
+              <p className="mt-1 font-semibold text-slate-900">
+                {formatDate(submission.verificationCodeExpiresAt)}
+              </p>
+            </div>
+
             <div>
               <p className="text-slate-500">Verified</p>
               <p className="mt-1 font-semibold text-slate-900">
                 {formatDate(submission.verifiedAt)}
               </p>
             </div>
+
             <div>
               <p className="text-slate-500">Reviewed</p>
               <p className="mt-1 font-semibold text-slate-900">
                 {formatDate(submission.reviewedAt)}
                 {submission.reviewedBy
-                  ? ` Â· ${submission.reviewedBy.fullName || submission.reviewedBy.email || "Admin"}`
+                  ? ` · ${
+                      submission.reviewedBy.fullName ||
+                      submission.reviewedBy.email ||
+                      "Admin"
+                    }`
                   : ""}
               </p>
             </div>
           </div>
 
-          {submission.rejectionReason && submission.rejectionReason !== "INCORRECT_CODE_RETRY" && (
-            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4">
-              <p className="font-bold text-red-900">Rejection reason</p>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-red-800">
-                {submission.rejectionReason}
-              </p>
-            </div>
-          )}
+          {submission.rejectionReason &&
+            submission.rejectionReason !== "INCORRECT_CODE_RETRY" && (
+              <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4">
+                <p className="font-bold text-red-900">
+                  Rejection reason
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-red-800">
+                  {submission.rejectionReason}
+                </p>
+              </div>
+            )}
         </section>
 
         {submission.fundingId && (
@@ -301,10 +425,12 @@ export default async function SpecialCardReviewPage({
                 Funding record created
               </h2>
             </div>
+
             <p className="mt-2 text-sm text-emerald-900">
               This submission has a linked funding record. Continue reviewing
               it in the existing funding workflow.
             </p>
+
             <Link
               href={`/admin/wealth-box/${submission.fundingId}`}
               className="mt-4 inline-flex rounded-xl bg-emerald-800 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-900"
@@ -317,10 +443,7 @@ export default async function SpecialCardReviewPage({
         {canReview && (
           <SpecialCardAdminControls
             submissionId={submission.id}
-            status={submission.status}
-            phone={submission.user.phone}
-            failedAttempts={submission.failedAttempts}
-            lastCodeRequestAt={submission.lastCodeRequestAt?.toISOString() ?? null}
+            verificationCode={codeValue ?? undefined}
           />
         )}
 

@@ -1,4 +1,12 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+@source "./";
+@source "../components";
+@source "../lib";
+@source "../public";
+@source "../scripts";
+@source "../instrumentation.ts";
+@source "../middleware.ts";
+@source "../next.config.ts";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
@@ -194,7 +202,7 @@
 /* Page background */
 html {
   color-scheme: light;
-  background: #f8fafc;
+  background: #eef3f0;
 }
 
 html.dark {
@@ -202,25 +210,31 @@ html.dark {
   background: #020617;
 }
 
-/* Common dashboard surfaces */
+/* Shared dark-mode surfaces and text */
 .dark .bg-white {
   background-color: rgb(15 23 42) !important;
 }
 
-.dark .bg-slate-50 {
+.dark .bg-slate-50,
+.dark .bg-slate-50\/50,
+.dark .bg-slate-50\/60,
+.dark .bg-slate-50\/70,
+.dark .bg-slate-50\/80 {
   background-color: rgb(2 6 23) !important;
 }
 
-.dark .bg-slate-100 {
+.dark .bg-slate-100,
+.dark .bg-slate-100\/90 {
   background-color: rgb(30 41 59) !important;
 }
 
-.dark .bg-slate-200 {
+.dark .bg-slate-200,
+.dark .bg-slate-200\/80 {
   background-color: rgb(51 65 85) !important;
 }
 
-/* Common dashboard text */
-.dark .text-slate-900 {
+.dark .text-slate-900,
+.dark .text-slate-950 {
   color: rgb(248 250 252) !important;
 }
 
@@ -236,24 +250,26 @@ html.dark {
   color: rgb(203 213 225) !important;
 }
 
-.dark .text-slate-500 {
+.dark .text-slate-500,
+.dark .text-slate-400 {
   color: rgb(148 163 184) !important;
 }
 
-.dark .text-slate-400 {
-  color: rgb(100 116 139) !important;
-}
-
-.dark .text-slate-300 {
+.dark .text-slate-300,
+.dark .text-slate-200 {
   color: rgb(203 213 225) !important;
 }
 
-/* Common borders */
-.dark .border-slate-100 {
-  border-color: rgb(30 41 59) !important;
+/* Dark borders and dividers */
+.dark .border-slate-100,
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgb(51 65 85) !important;
 }
 
-.dark .border-slate-200 {
+.dark .border-slate-200,
+.dark .border-slate-200\/70,
+.dark .border-slate-200\/80,
+.dark .border-slate-200\/90 {
   border-color: rgb(51 65 85) !important;
 }
 
@@ -270,27 +286,156 @@ html.dark {
 
 .dark input.bg-white,
 .dark select.bg-white,
-.dark textarea.bg-white {
-  background-color: rgb(15 23 42) !important;
-}
-
+.dark textarea.bg-white,
 .dark input.bg-slate-50,
 .dark select.bg-slate-50,
 .dark textarea.bg-slate-50 {
   background-color: rgb(15 23 42) !important;
+  color: rgb(248 250 252) !important;
 }
 
-/* Financial green */
-.dark .bg-emerald-50 {
-  background-color: rgb(16 185 129 / 0.10) !important;
+/* Emerald surfaces: preserve the financial accent without pale panels */
+.dark .bg-emerald-50,
+.dark [class~="bg-emerald-50/20"],
+.dark [class~="bg-emerald-50/30"],
+.dark [class~="bg-emerald-50/35"],
+.dark [class~="bg-emerald-50/45"],
+.dark [class~="bg-emerald-50/50"],
+.dark [class~="bg-emerald-50/60"],
+.dark [class~="bg-emerald-50/70"],
+.dark [class~="bg-emerald-50/80"],
+.dark .bg-emerald-100,
+.dark .bg-emerald-100\/80 {
+  background-color: rgb(16 185 129 / 0.12) !important;
 }
 
-.dark .text-emerald-600 {
-  color: rgb(52 211 153) !important;
+.dark .bg-emerald-200,
+.dark .bg-emerald-300,
+.dark .bg-emerald-400,
+.dark .bg-emerald-500,
+.dark .bg-emerald-600,
+.dark .bg-emerald-700,
+.dark .bg-emerald-800,
+.dark .bg-emerald-900 {
+  color: rgb(248 250 252) !important;
+}
+
+.dark .text-emerald-600,
+.dark .text-emerald-700,
+.dark .text-emerald-800,
+.dark .text-emerald-900,
+.dark .text-emerald-950 {
+  color: rgb(110 231 183) !important;
 }
 
 .dark .text-emerald-500 {
   color: rgb(52 211 153) !important;
+}
+
+.dark .border-emerald-100,
+.dark .border-emerald-200,
+.dark .border-emerald-300 {
+  border-color: rgb(6 95 70 / 0.8) !important;
+}
+
+/* Red error and danger surfaces remain distinguishable */
+.dark .bg-red-50,
+.dark .bg-red-100,
+.dark .bg-red-400\/10,
+.dark .bg-red-500\/5,
+.dark .bg-red-500\/10,
+.dark .bg-red-500\/10 {
+  background-color: rgb(127 29 29 / 0.24) !important;
+}
+
+.dark .text-red-600,
+.dark .text-red-700,
+.dark .text-red-800,
+.dark .text-red-900,
+.dark .text-red-950,
+.dark .text-rose-600,
+.dark .text-rose-700,
+.dark .text-rose-800,
+.dark .text-rose-900 {
+  color: rgb(252 165 165) !important;
+}
+
+.dark .border-red-100,
+.dark .border-red-200,
+.dark .border-red-300,
+.dark .border-rose-200 {
+  border-color: rgb(153 27 27 / 0.75) !important;
+}
+
+/* Amber warning and notice surfaces */
+.dark .bg-amber-50,
+.dark .bg-amber-100,
+.dark .bg-amber-300\/10,
+.dark .bg-amber-400\/10,
+.dark .bg-amber-500\/10 {
+  background-color: rgb(146 64 14 / 0.22) !important;
+}
+
+.dark .text-amber-600,
+.dark .text-amber-700,
+.dark .text-amber-800,
+.dark .text-amber-900,
+.dark .text-amber-950 {
+  color: rgb(253 230 138) !important;
+}
+
+.dark .border-amber-100,
+.dark .border-amber-200,
+.dark .border-amber-300 {
+  border-color: rgb(146 64 14 / 0.8) !important;
+}
+
+/* Blue informational surfaces */
+.dark .bg-blue-50,
+.dark .bg-blue-100 {
+  background-color: rgb(30 64 175 / 0.22) !important;
+}
+
+.dark .text-blue-600,
+.dark .text-blue-700,
+.dark .text-blue-800,
+.dark .text-blue-900,
+.dark .text-blue-950 {
+  color: rgb(147 197 253) !important;
+}
+
+.dark .border-blue-200,
+.dark .border-blue-300 {
+  border-color: rgb(30 64 175 / 0.75) !important;
+}
+
+/* Other light neutral and status surfaces */
+.dark .bg-orange-50,
+.dark .bg-orange-100,
+.dark .bg-rose-50,
+.dark .bg-rose-100,
+.dark .bg-violet-50,
+.dark .bg-purple-100,
+.dark .bg-yellow-100 {
+  background-color: rgb(30 41 59) !important;
+}
+
+.dark .text-orange-600,
+.dark .text-orange-700,
+.dark .text-orange-800,
+.dark .text-orange-950,
+.dark .text-violet-700,
+.dark .text-violet-800,
+.dark .text-violet-950,
+.dark .text-purple-700,
+.dark .text-yellow-700 {
+  color: rgb(253 186 116) !important;
+}
+
+.dark .border-orange-200,
+.dark .border-rose-200,
+.dark .border-violet-200 {
+  border-color: rgb(71 85 105) !important;
 }
 
 /* Hover states */
@@ -306,16 +451,87 @@ html.dark {
   color: rgb(248 250 252) !important;
 }
 
-/* Placeholder */
 .dark .placeholder\:text-slate-400::placeholder {
-  color: rgb(100 116 139) !important;
+  color: rgb(148 163 184) !important;
 }
 
-/* Reduce harsh shadows in dark mode */
+/* Softer shadows on dark surfaces */
 .dark .shadow-sm,
 .dark .shadow,
 .dark .shadow-md,
 .dark .shadow-lg,
 .dark .shadow-xl {
   --tw-shadow-color: rgb(0 0 0 / 0.25);
+}
+/* Targeted dark-mode contrast for dashboard components with hard-coded colors */
+
+/* Readable text for components using the hard-coded MooGold dark green */
+.dark .moogold-dashboard-theme [class~="text-[#10201b]"] {
+  color: rgb(241 245 249) !important;
+}
+
+/* Keep dark lettering on bright emerald controls */
+.dark .moogold-dashboard-theme [class~="text-[#10201b]"][class~="bg-emerald-300"],
+.dark .moogold-dashboard-theme [class~="text-[#10201b]"][class~="bg-emerald-400"],
+.dark .moogold-dashboard-theme [class~="text-[#10201b]"][class~="bg-emerald-500"] {
+  color: rgb(16 32 27) !important;
+}
+
+/* Replace low-contrast black text with readable secondary text */
+.dark .moogold-dashboard-theme [class~="text-black/15"],
+.dark .moogold-dashboard-theme [class~="text-black/25"],
+.dark .moogold-dashboard-theme [class~="text-black/35"],
+.dark .moogold-dashboard-theme [class~="text-black/40"] {
+  color: rgb(148 163 184) !important;
+}
+
+.dark .moogold-dashboard-theme [class~="text-black/50"],
+.dark .moogold-dashboard-theme [class~="text-black/55"],
+.dark .moogold-dashboard-theme [class~="text-black/60"],
+.dark .moogold-dashboard-theme [class~="text-black/70"] {
+  color: rgb(203 213 225) !important;
+}
+
+/* Make translucent white text readable on dark dashboard surfaces */
+.dark .moogold-dashboard-theme [class~="text-white/35"],
+.dark .moogold-dashboard-theme [class~="text-white/45"],
+.dark .moogold-dashboard-theme [class~="text-white/55"],
+.dark .moogold-dashboard-theme [class~="text-white/65"] {
+  color: rgb(226 232 240) !important;
+}
+
+/* Improve the green balance label and balance amount */
+.dark .moogold-dashboard-theme [class~="text-emerald-300/60"],
+.dark .moogold-dashboard-theme [class~="text-emerald-300/70"],
+.dark .moogold-dashboard-theme [class~="text-emerald-300/80"] {
+  color: rgb(167 243 208) !important;
+}
+
+/* Readable placeholder text */
+.dark .moogold-dashboard-theme [class~="placeholder:text-black/15"]::placeholder,
+.dark .moogold-dashboard-theme [class~="placeholder:text-black/25"]::placeholder {
+  color: rgb(148 163 184) !important;
+  opacity: 1;
+}
+
+/* Convert hard-coded pale dashboard panels into dark surfaces */
+.dark .moogold-dashboard-theme [class~="bg-[#f5f8f6]"],
+.dark .moogold-dashboard-theme [class~="bg-[#f7faf8]"],
+.dark .moogold-dashboard-theme [class~="bg-[#f8faf9]"] {
+  background-color: rgb(30 41 59) !important;
+}
+
+/* Keep disabled inputs dark instead of pale in dark mode */
+.dark .moogold-dashboard-theme [class~="disabled:bg-[#f8faf9]"]:disabled {
+  background-color: rgb(30 41 59) !important;
+}
+
+/* Make subtle form borders visible against dark surfaces */
+.dark .moogold-dashboard-theme [class~="border-black/5"],
+.dark .moogold-dashboard-theme [class~="border-black/10"] {
+  border-color: rgb(71 85 105) !important;
+}
+/* Off-white background for registration verification and PIN screens */
+body:has(.registration-page-offwhite) {
+  background-color: #eef3f0;
 }

@@ -167,9 +167,12 @@ export default async function AdminWithdrawalDetailPage({
     transaction.user.phone ||
     "MooGold User";
 
-  const balanceSource = getBalanceSource(
-    transaction.balanceType,
-  );
+  const isLoanCashout =
+    transaction.withdrawalDetails?.notes === "REGULAR_LOAN_CASHOUT";
+
+  const balanceSource = isLoanCashout
+    ? { label: "Loan Balance", shortLabel: "Loan" }
+    : getBalanceSource(transaction.balanceType);
 
   const accountNumber =
     transaction.withdrawalDetails
@@ -216,7 +219,7 @@ export default async function AdminWithdrawalDetailPage({
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-medium text-emerald-700">
-                    Withdrawal Review
+                    {isLoanCashout ? "Loan Balance Cash-out Review" : "Withdrawal Review"}
                   </p>
 
                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">

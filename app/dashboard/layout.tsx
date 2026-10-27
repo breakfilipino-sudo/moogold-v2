@@ -1,4 +1,4 @@
-﻿import type { ReactNode } from "react";
+import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 
 import Sidebar from "@/components/dashboard/sidebar";
@@ -77,7 +77,7 @@ export default async function DashboardLayout({
   return (
     <DashboardProvider>
       <RememberAccountPresence />
-      <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
+      <div className="moogold-dashboard-theme min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
         <div className="flex min-h-screen">
           <Sidebar
             displayName={name}

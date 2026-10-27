@@ -99,6 +99,7 @@ export default async function AdminWithdrawalsPage() {
           bankName: true,
           bankAccountName: true,
           bankAccountNumber: true,
+          notes: true,
         },
       },
     },
@@ -313,13 +314,23 @@ export default async function AdminWithdrawalsPage() {
                           {transaction.currency !== "USD" &&
                             transaction.usdAmount && (
                               <p className="mt-0.5 text-xs text-slate-500">
-                                ≈{" "}
+                                â‰ˆ{" "}
                                 {formatAmount(
                                   transaction.usdAmount,
                                   "USD",
                                 )}
                               </p>
                             )}
+
+                          <p className="mt-1 text-xs font-medium text-slate-500">
+                            {transaction.withdrawalDetails?.notes === "REGULAR_LOAN_CASHOUT"
+                              ? "Loan Balance"
+                              : transaction.balanceType === "REFERRAL"
+                                ? "Referral balance"
+                                : transaction.balanceType === "CASH"
+                                  ? "Cash balance"
+                                  : `${transaction.balanceType} balance`}
+                          </p>
                         </td>
 
                         <td className="px-6 py-4">

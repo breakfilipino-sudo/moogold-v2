@@ -1,5 +1,6 @@
-﻿import type { Metadata, Viewport } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
@@ -46,11 +47,18 @@ export default function RootLayout({
   children,
 }: RootLayoutProps) {
   return (
-    <html
+    <html suppressHydrationWarning
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
+        <Script
+          id="moogold-theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var saved=localStorage.getItem("moogold-theme");var theme=(saved==="light"||saved==="dark"||saved==="system")?saved:"system";var dark=theme==="dark"||(theme==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);var root=document.documentElement;root.classList.toggle("dark",dark);root.style.colorScheme=dark?"dark":"light";}catch(e){}})();`,
+          }}
+        />
         <PwaRegister />
         {children}
       </body>

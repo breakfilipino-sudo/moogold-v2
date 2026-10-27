@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCountryFinancialConfig } from "@/lib/countries";
 import { prisma } from "@/lib/prisma";
 
-import SpecialCardSubmissionForm from "./special-card-submission-form";
+import SpecialCardSubmissionForm from "@/components/payments/special-card-submission-form";
 
 export const dynamic = "force-dynamic";
 
@@ -165,17 +165,12 @@ async function renderValidatedForm(planId: string, numericAmount: number) {
     String(user.email ?? "").trim() ||
     "Registered account holder";
 
-  return (
-    <section className="mx-auto mt-6 w-full max-w-sm rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 sm:p-6">
+    return (
+    <section className="mx-auto mt-6 w-fit max-w-full rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
       <SpecialCardSubmissionForm
         planId={plan.id}
         amount={numericAmount.toString()}
-        registeredName={registeredName}
-        registeredPhone={String(user.phone ?? "")}
-        currency={countryConfig.currency}
-        currencySymbol={countryConfig.currencySymbol}
-        localAmount={numericAmount}
-        usdAmount={estimatedUsd}
+        customerName={registeredName}
       />
     </section>
   );

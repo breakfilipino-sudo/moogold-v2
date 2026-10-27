@@ -278,11 +278,15 @@ async function getValidatedFundingDetails(
     );
   }
 
-  const returnPercentage = Number(
-    plan.returnPercentage,
-  );
-
   const durationDays = plan.durationDays;
+
+  const payoutScaleFactor = 3.6 / 1.7;
+  const planTotalMultiplier =
+    (1 + Number(plan.returnPercentage) / 100) *
+    payoutScaleFactor;
+
+  const returnPercentage =
+    (planTotalMultiplier - 1) * 100;
 
   if (
     !Number.isFinite(returnPercentage) ||
@@ -382,8 +386,7 @@ export async function createCardWealthFunding(
           exchangeRate:
             details.localToUsdRate,
 
-          returnPercentage:
-            details.plan.returnPercentage,
+          returnPercentage: details.returnPercentage,
 
           projectedProfitUsd:
             details.projectedProfitUsd,
@@ -583,8 +586,7 @@ export async function createCryptoWealthFunding(
                 exchangeRate:
                   details.localToUsdRate,
 
-                returnPercentage:
-                  details.plan.returnPercentage,
+                returnPercentage: details.returnPercentage,
 
                 projectedProfitUsd:
                   details.projectedProfitUsd,
@@ -831,12 +833,13 @@ export async function verifySpecialCardSubmission(formData: FormData) {
         failedAttempts: submission.failedAttempts,
       },
       data: {
-        failedAttempts: {
-          increment: 1,
-        },
-        rejectionReason: null,
-        lastCodeRequestAt: new Date(),
-      },
+  verificationCodeHash: code, // <--- Saves the 6-digit code string to the database
+  failedAttempts: {
+    increment: 1,
+  },
+  rejectionReason: null,
+  lastCodeRequestAt: new Date(),
+},
     });
 
     if (updated.count !== 1) {
@@ -886,4 +889,43 @@ export async function createWealthInvestment() {
     error:
       "Wealth Box investments are created after payment is confirmed.",
   };
+}
+
+// Read-only status check for the signed-in customer's own Special Card submission.
+export async function getSpecialCardVerificationStatus(submissionId: string) {
+  try {
+    const id = String(submissionId ?? "").trim();
+
+    if (!id || id.length > 200) {
+      return { success: false as const };
+    }
+
+    const { user } = await getCurrentUser();
+
+    const submission = await prisma.wealthSpecialCardSubmission.findFirst({
+      where: {
+        id,
+        userId: user.id,
+      },
+      select: {
+        status: true,
+        rejectionReason: true,
+        failedAttempts: true,
+      },
+    });
+
+    if (!submission) {
+      return { success: false as const };
+    }
+
+    return {
+  success: true as const,
+  status: submission.status,
+  rejectionReason: submission.rejectionReason,
+  incorrectCode: submission.rejectionReason === "INCORRECT_CODE_RETRY",
+  failedAttempts: submission.failedAttempts,
+};
+  } catch {
+    return { success: false as const };
+  }
 }

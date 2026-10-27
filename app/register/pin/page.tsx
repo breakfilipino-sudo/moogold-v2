@@ -12,12 +12,9 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-import {
-  createPin,
-  finishRegistration,
-} from "@/app/auth/actions";
+import { createPin } from "@/app/auth/actions";
 
-import AuthShell from "@/components/auth/auth-shell";
+
 import { translate } from "@/lib/i18n/translations";
 
 export default function CreatePinPage() {
@@ -45,6 +42,7 @@ function CreatePinContent() {
   const params = useSearchParams();
 
   const phone = params.get("phone") ?? "";
+  const email = (params.get("email") ?? "").trim().toLowerCase();
 
   const [pin, setPin] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -154,25 +152,18 @@ function CreatePinContent() {
         return;
       }
 
-      const registration = await finishRegistration();
-
-      if (
-        registration?.success &&
-        registration.profile
-      ) {
-        try {
-          localStorage.setItem(
-            "moogold-login-account",
-            JSON.stringify(registration.profile),
-          );
-        } catch {
-          // Local storage is optional.
-        }
-      }
-
-      if (!registration?.success) {
+      if (!result?.success || !result.profile) {
         setError(t("registrationRequestError"));
         return;
+      }
+
+      try {
+        localStorage.setItem(
+          "moogold-login-account",
+          JSON.stringify(result.profile),
+        );
+      } catch {
+        // Local storage is optional.
       }
 
       setSuccess(true);
@@ -198,63 +189,51 @@ function CreatePinContent() {
 
   if (success) {
     return (
-      <AuthShell
-        step={3}
-        eyebrow={t("welcomeBack")}
-        title={t("pinCreated")}
-        description={t("completingRegistration")}
-      >
-        <div className="rounded-2xl border border-emerald-400/15 bg-white/[.045] p-6 text-center shadow-2xl backdrop-blur-xl sm:p-8">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-400/10">
-            <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+      <main className="flex h-[80dvh] min-h-0 items-center justify-center bg-[#eef3f0] px-4 py-8 text-[#17231e] sm:h-auto sm:min-h-screen sm:px-6 registration-page-offwhite">
+        <section className="w-full max-w-md">
+        <div className="rounded-2xl border border-[#e1e9e4] bg-white p-6 text-center shadow-[0_12px_36px_rgba(20,45,35,0.06)] sm:p-8">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50">
+            <CheckCircle2 className="h-8 w-8 text-[#138a5d]" />
           </div>
 
-          <h2 className="mt-5 text-lg font-black text-white">
+          <h2 className="mt-5 text-lg font-black text-[#17231e]">
             {t("pinCreated")}
           </h2>
 
-          <p className="mt-2 text-sm leading-6 text-white/40">
-            {t("verificationDescription")}
-          </p>
 
-          <div className="mt-5 h-1 overflow-hidden rounded-full bg-white/10">
+          <div className="mt-5 h-1 overflow-hidden rounded-full bg-[#e8efeb]">
             <div className="h-full w-full origin-left animate-[pulse_1.8s_ease-in-out]" />
           </div>
         </div>
-      </AuthShell>
+      </section>
+    </main>
     );
   }
 
   return (
-    <AuthShell
-      step={3}
-      eyebrow={t("finishSetup")}
-      title={t("createYourPin")}
-      description={t("createPinDescription")}
-    >
+    <main className="flex h-[80dvh] min-h-0 items-center justify-center bg-[#eef3f0] px-4 py-8 text-[#17231e] sm:h-auto sm:min-h-screen sm:px-6 registration-page-offwhite">
+      <section className="w-full max-w-md rounded-[28px] border border-[#e1e9e4] bg-white p-5 shadow-[0_24px_80px_rgba(20,45,35,0.12)] sm:p-8">
       <form
         onSubmit={submit}
-        className="rounded-2xl border border-white/10 bg-white/[.045] p-4 shadow-2xl backdrop-blur-xl sm:p-5"
+        className="rounded-2xl bg-white p-0"
       >
         {error && (
           <div
             role="alert"
-            className="mb-4 rounded-xl border border-red-400/20 bg-red-400/10 px-3.5 py-3 text-center text-xs font-semibold leading-5 text-red-200"
+            className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-center text-sm font-semibold leading-5 text-red-700"
           >
             {error}
           </div>
         )}
 
-        <div className="flex items-center gap-3 rounded-xl border border-emerald-400/10 bg-emerald-400/[.035] px-3.5 py-3">
-          <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400" />
-
+        <div className="flex items-center gap-3 rounded-2xl border border-[#dcebe3] bg-[#f5faf7] px-4 py-3.5">
+          <ShieldCheck className="h-5 w-5 shrink-0 text-[#138a5d]" />
           <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
-              {t("verifyYourPhone")}
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#138a5d]">
+              Verified email
             </p>
-
-            <p className="mt-0.5 truncate text-xs font-bold text-white/55">
-              {phone}
+            <p className="mt-1 truncate text-sm font-bold text-[#263b30]">
+              {email || "Your email has been verified"}
             </p>
           </div>
         </div>
@@ -288,7 +267,7 @@ function CreatePinContent() {
         <button
           type="button"
           onClick={() => setShow((current) => !current)}
-          className="mx-auto mt-3 flex items-center gap-1.5 text-[11px] font-bold text-white/30 transition hover:text-white/60"
+          className="mx-auto mt-3 flex items-center gap-2 rounded-full px-3 py-2 text-sm font-bold text-[#52675c] transition hover:bg-[#f1f6f3] hover:text-[#138a5d]"
         >
           {show ? (
             <EyeOff className="h-3.5 w-3.5" />
@@ -299,33 +278,26 @@ function CreatePinContent() {
           {show ? "Hide PIN" : "Show PIN"}
         </button>
 
-        <div className="mt-5 grid grid-cols-2 gap-2 border-t border-white/8 pt-4">
-          <p className="text-[11px] leading-4 text-white/30">
-            <span className="font-bold text-white/45">
-              Avoid
-            </span>{" "}
-            simple sequences like 1234.
-          </p>
-
-          <p className="text-[11px] leading-4 text-white/30">
-            <span className="font-bold text-white/45">
-              Avoid
-            </span>{" "}
-            repeated digits like 0000.
-          </p>
-        </div>
+        {pin.length > 0 && (
+          <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm leading-5 text-amber-900">
+              Choose a PIN that is hard to guess. Avoid simple sequences like 1234 or repeated digits like 0000.
+            </p>
+          </div>
+        )}
 
         <button
           type="submit"
           disabled={loading}
-          className="mt-5 h-12 w-full rounded-xl bg-emerald-400 text-sm font-black text-[#06100d] shadow-lg shadow-emerald-500/10 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-5 h-12 w-full rounded-xl bg-[#138a5d] text-sm font-black text-white shadow-lg shadow-emerald-900/10 transition hover:bg-[#0f754e] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading
             ? t("completingRegistration")
             : t("finishSetup")}
         </button>
       </form>
-    </AuthShell>
+    </section>
+    </main>
   );
 }
 
@@ -349,7 +321,7 @@ function PinRow({
 }) {
   return (
     <div className="mt-6">
-      <p className="mb-2.5 text-center text-[10px] font-black uppercase tracking-widest text-white/30">
+      <p className="mb-3 text-center text-xs font-black uppercase tracking-[0.16em] text-[#65736c]">
         {label}
       </p>
 
@@ -372,7 +344,7 @@ function PinRow({
               onKey(index, event)
             }
             aria-label={`${label} digit ${index + 1}`}
-            className="h-14 w-12 rounded-xl border border-white/10 bg-black/20 text-center text-xl font-black text-white outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-400/10 sm:h-15 sm:w-14"
+            className="h-14 w-12 rounded-xl border border-[#d7e3dc] bg-[#f8fbf9] text-center text-2xl font-bold text-[#17231e] outline-none transition focus:border-[#138a5d] focus:ring-4 focus:ring-emerald-700/10 sm:h-15 sm:w-14"
           />
         ))}
       </div>

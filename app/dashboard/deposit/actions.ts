@@ -5,10 +5,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getCountryFinancialConfig } from "@/lib/countries";
+import { getMinimumTopUpAmount } from "@/lib/deposit/minimum-top-up";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 
-const MINIMUM_DEPOSIT_USD = 10;
 const MAXIMUM_DEPOSIT_USD = 100_000;
 
 async function requireUser() {
@@ -154,6 +154,14 @@ export async function requestDeposit(
 
   const currency =
     country.currency;
+  const minimumTopUp =
+    getMinimumTopUpAmount(countryCode);
+
+  if (minimumTopUp === null) {
+    throw new Error(
+      "A minimum top-up amount is not configured for your country.",
+    );
+  }
 
   const amountText =
     getRequiredValue(
@@ -260,14 +268,9 @@ export async function requestDeposit(
     );
   }
 
-  if (
-    usdAmount <
-    MINIMUM_DEPOSIT_USD
-  ) {
+  if (amount < minimumTopUp) {
     throw new Error(
-      `The minimum add-fund amount is $${MINIMUM_DEPOSIT_USD.toFixed(
-        2,
-      )} USD equivalent.`,
+      `The minimum top up amount is ${country.currencySymbol}${minimumTopUp.toLocaleString("en-US")}.`,
     );
   }
 

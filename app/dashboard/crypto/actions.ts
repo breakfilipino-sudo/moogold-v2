@@ -4,6 +4,7 @@ import { sendAdminEmailAlert } from "@/lib/admin-email-alerts";
 import { Prisma } from "../../../generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
+import { validateCryptoWithdrawalAddress } from "@/lib/crypto/address-validation";
 
 /*
  * ============================================================
@@ -17,6 +18,12 @@ import { createClient } from "@/lib/supabase/server";
  * as the crypto deposit system.
  */
 
+function isTransactionConflict(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2034"
+  );
+}
 const CRYPTO_OPTIONS = {
   USDC: {
     network: "ETHEREUM" as const,
@@ -311,21 +318,21 @@ export async function submitCryptoDeposit(formData: FormData) {
  * Flow:
  *
  * User requests withdrawal
- *          ↓
+ *          â†“
  * Server validates request
- *          ↓
+ *          â†“
  * Server checks actual balance
- *          ↓
+ *          â†“
  * CryptoWithdrawal = PENDING
- *          ↓
+ *          â†“
  * Admin reviews
- *          ↓
+ *          â†“
  * Admin approves
- *          ↓
+ *          â†“
  * Balance is deducted
- *          ↓
+ *          â†“
  * CryptoLedgerEntry = DEBIT
- *          ↓
+ *          â†“
  * Withdrawal = COMPLETED
  *
  * Rejected withdrawals never affect the balance.
@@ -431,38 +438,24 @@ export async function submitCryptoWithdrawal(formData: FormData) {
    * VALIDATE DESTINATION ADDRESS
    * ----------------------------------------------------------
    *
-   * We deliberately do not trust the browser.
-   *
-   * Network-specific address validation will be strengthened
-   * later with proper blockchain/address libraries.
-   *
-   * For this stage we enforce:
-   * - required
-   * - trimmed
-   * - reasonable length
+   * Use server-side, asset-specific blockchain address validation.
+   * This remains before fee calculation, balance reservation, and
+   * pending withdrawal creation.
    */
 
-  if (!destinationAddress) {
+  const addressValidation = validateCryptoWithdrawalAddress(
+    assetInput,
+    destinationAddress,
+  );
+
+  if (!addressValidation.valid) {
     return {
       success: false,
-      error: "Please enter the destination wallet address.",
+      error:
+        addressValidation.error ??
+        "The destination wallet address is invalid for the selected network.",
     };
   }
-
-  if (destinationAddress.length < 20) {
-    return {
-      success: false,
-      error: "The destination wallet address appears to be invalid.",
-    };
-  }
-
-  if (destinationAddress.length > 255) {
-    return {
-      success: false,
-      error: "The destination wallet address is too long.",
-    };
-  }
-
   /*
    * ----------------------------------------------------------
    * SERVER-CONTROLLED FEE
@@ -509,8 +502,31 @@ export async function submitCryptoWithdrawal(formData: FormData) {
        * withdrawal amount + fee
        */
 
-      if (cryptoBalance.balance.lessThan(totalAmount)) {
+      const availableBalance = cryptoBalance.balance.sub(
+        cryptoBalance.reservedBalance,
+      );
+
+      if (availableBalance.lessThan(totalAmount)) {
         throw new Error("INSUFFICIENT_CRYPTO_BALANCE");
+      }
+
+      /*
+       * Reserve funds within the transaction.
+       * Actual balance deduction still happens only on approval.
+       */
+      const reservationUpdate = await tx.cryptoBalance.updateMany({
+        where: {
+          id: cryptoBalance.id,
+          balance: cryptoBalance.balance,
+          reservedBalance: cryptoBalance.reservedBalance,
+        },
+        data: {
+          reservedBalance: cryptoBalance.reservedBalance.add(totalAmount),
+        },
+      });
+
+      if (reservationUpdate.count !== 1) {
+        throw new Error("CRYPTO_RESERVATION_CONFLICT");
       }
 
       /*
@@ -596,6 +612,13 @@ export async function submitCryptoWithdrawal(formData: FormData) {
   } catch (error) {
     console.error("Failed to create crypto withdrawal:", error);
 
+    if (isTransactionConflict(error)) {
+      return {
+        success: false,
+        error: "Your withdrawal could not be processed because the balance changed during a concurrent transaction. Please refresh your balance and try again.",
+      };
+    }
+
     if (
       error instanceof Error &&
       error.message === "CRYPTO_BALANCE_NOT_FOUND"
@@ -613,6 +636,16 @@ export async function submitCryptoWithdrawal(formData: FormData) {
       return {
         success: false,
         error: `Insufficient ${assetInput} balance for this withdrawal, including the network fee.`,
+      };
+    }
+
+    if (
+      error instanceof Error &&
+      error.message === "CRYPTO_RESERVATION_CONFLICT"
+    ) {
+      return {
+        success: false,
+        error: "Your balance changed while submitting this withdrawal. Please check your available balance and try again.",
       };
     }
 

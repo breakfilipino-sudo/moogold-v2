@@ -1,20 +1,18 @@
-import {
+﻿import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Bitcoin,
-  CircleArrowDown,
-  CircleArrowUp,
   CircleDollarSign,
   Coins,
   Gem,
 } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
-import { createClient } from "@/lib/supabase/server";
+import { getWithdrawalCountryConfig } from "@/lib/withdrawal";
 
-import CryptoDepositForm from "./crypto-deposit-form";
+import CryptoActionModals from "@/components/crypto/crypto-action-modals";
 
 const CRYPTO_OPTIONS = [
   {
@@ -111,16 +109,12 @@ function formatStatus(status: string) {
   switch (status) {
     case "COMPLETED":
       return "Completed";
-
     case "PROCESSING":
       return "Processing";
-
     case "REJECTED":
       return "Rejected";
-
     case "CANCELLED":
       return "Cancelled";
-
     default:
       return "Pending";
   }
@@ -130,16 +124,12 @@ function getStatusClasses(status: string) {
   switch (status) {
     case "COMPLETED":
       return "bg-emerald-50 text-emerald-700";
-
     case "PROCESSING":
       return "bg-blue-50 text-blue-700";
-
     case "REJECTED":
       return "bg-red-50 text-red-700";
-
     case "CANCELLED":
       return "bg-slate-100 text-slate-600";
-
     default:
       return "bg-amber-50 text-amber-700";
   }
@@ -176,38 +166,19 @@ async function getCryptoPrices(): Promise<CryptoPriceMap> {
 }
 
 export default async function CryptoDashboardPage() {
-  const supabase = await createClient();
+  const { user } = await getCurrentUser();
 
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser();
-
-  if (!authUser) {
-    redirect("/login");
-  }
-
-  const user = await prisma.user.findUnique({
-    where: {
-      authUserId: authUser.id,
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const [balances, deposits, withdrawals, prices] = await Promise.all([
+  const [balances, deposits, withdrawals, loans, conversions, prices] = await Promise.all([
     prisma.cryptoBalance.findMany({
       where: {
         userId: user.id,
       },
       select: {
+        id: true,
         asset: true,
         network: true,
         balance: true,
+        reservedBalance: true,
       },
     }),
 
@@ -240,6 +211,9 @@ export default async function CryptoDashboardPage() {
         asset: true,
         network: true,
         amount: true,
+        fee: true,
+        totalAmount: true,
+        rejectionReason: true,
         usdAmount: true,
         status: true,
         destinationAddress: true,
@@ -251,6 +225,56 @@ export default async function CryptoDashboardPage() {
       take: 10,
     }),
 
+    prisma.cryptoLoan.findMany({
+      where: { userId: user.id },
+      select: {
+        id: true,
+        reference: true,
+        principalAmount: true,
+        collateralAmount: true,
+        principalUsdValue: true,
+        repaidAmount: true,
+        status: true,
+        createdAt: true,
+        borrowedCryptoBalance: {
+          select: {
+            asset: true,
+            network: true,
+            balance: true,
+            reservedBalance: true,
+          },
+        },
+        cryptoBalance: {
+          select: {
+            asset: true,
+            network: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    }),
+
+    prisma.cryptoCashConversion.findMany({
+      where: { userId: user.id },
+      select: {
+        id: true,
+        reference: true,
+        asset: true,
+        network: true,
+        cryptoAmount: true,
+        payoutAmount: true,
+        payoutCurrency: true,
+        bankName: true,
+        accountName: true,
+        accountNumberLast4: true,
+        status: true,
+        quoteExpiresAt: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    }),
     getCryptoPrices(),
   ]);
 
@@ -286,8 +310,7 @@ export default async function CryptoDashboardPage() {
       asset: deposit.asset,
       network: deposit.network,
       amount:
-        deposit.amount?.toString() ??
-        "No deposit detected",
+        deposit.amount?.toString() ?? "No deposit detected",
       usdAmount:
         deposit.usdAmount !== null
           ? Number(deposit.usdAmount)
@@ -297,6 +320,7 @@ export default async function CryptoDashboardPage() {
       transactionHash: deposit.transactionHash,
       destinationAddress: null,
     })),
+
     ...withdrawals.map((withdrawal) => ({
       id: `withdrawal-${withdrawal.id}`,
       type: "WITHDRAWAL" as const,
@@ -320,69 +344,87 @@ export default async function CryptoDashboardPage() {
     .slice(0, 8);
 
   return (
-    <div className="space-y-4 pb-8">
-      {/* Header */}
-      <div className="flex flex-col gap-3 border-b border-slate-200 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-            <Coins className="h-4 w-4" />
-          </div>
-
+    <div className="space-y-4 pb-5">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="relative flex flex-col gap-5 bg-gradient-to-br from-[#0B241B] via-[#103D2B] to-[#176344] px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-7 sm:py-7">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900">
-              Crypto
-            </h1>
-
-            <p className="text-sm text-slate-500">
-              Manage your cryptocurrency assets.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Total balance and actions */}
-      <section className="rounded-xl border border-slate-200 bg-white">
-        <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div>
-            <p className="text-xs font-medium text-slate-500">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-100/90">
               Total crypto value
             </p>
 
-            <p className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
+            <p className="mt-1 text-4xl font-semibold tracking-[-0.045em] text-white sm:text-5xl">
               {formatUsd(totalUsd)}
             </p>
 
-            <p className="mt-0.5 text-xs text-slate-400">
+            <p className="mt-1 text-xs text-emerald-100/80">
               Current market value
             </p>
           </div>
 
-          <div className="flex w-full gap-2 sm:w-auto">
-            <Link
-              href="#crypto-deposit"
-              className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 text-xs font-medium text-white transition hover:bg-emerald-700 sm:flex-none"
-            >
-              <CircleArrowDown className="h-3.5 w-3.5" />
-              Deposit
-            </Link>
 
-            <Link
-              href="/dashboard/crypto/withdrawal"
-              className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50 sm:flex-none"
-            >
-              <CircleArrowUp className="h-3.5 w-3.5" />
-              Withdraw
-            </Link>
-          </div>
         </div>
       </section>
-
-      {/* Assets */}
-      <section className="rounded-xl border border-slate-200 bg-white">
-        <SectionHeader
-          title="Your crypto assets"
-          description="Balances held in your MooGold crypto wallet."
-        />
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+<CryptoActionModals
+            totalCryptoUsd={totalUsd}
+            registeredFullName={user.fullName}
+            bankOptions={[...(getWithdrawalCountryConfig(user.countryCode)?.banks ?? [])]}
+            withdrawalBalances={balances.map((balance) => ({
+              id: balance.id,
+              asset: balance.asset,
+              network: balance.network,
+              balance: balance.balance.sub(balance.reservedBalance).toString(),
+            }))}
+            withdrawalHistory={withdrawals.map((withdrawal) => ({
+              id: withdrawal.id,
+              asset: withdrawal.asset,
+              network: withdrawal.network,
+              amount: withdrawal.amount.toString(),
+              fee: withdrawal.fee.toString(),
+              totalAmount: withdrawal.totalAmount.toString(),
+              destinationAddress: withdrawal.destinationAddress,
+              status: withdrawal.status,
+              rejectionReason: withdrawal.rejectionReason,
+              createdAt: withdrawal.createdAt.toISOString(),
+            }))}
+            loans={loans.map((loan) => ({
+              id: loan.id,
+              reference: loan.reference,
+              principalAmount: loan.principalAmount.toString(),
+              outstandingAmount: loan.principalAmount.sub(loan.repaidAmount).toString(),
+              collateralAmount: loan.collateralAmount.toString(),
+              principalUsdValue: loan.principalUsdValue.toString(),
+              repaidAmount: loan.repaidAmount.toString(),
+              status: loan.status,
+              createdAt: loan.createdAt.toISOString(),
+              borrowedAsset: loan.borrowedCryptoBalance.asset,
+              borrowedNetwork: loan.borrowedCryptoBalance.network,
+              borrowedAvailable: loan.borrowedCryptoBalance.balance
+                .sub(loan.borrowedCryptoBalance.reservedBalance)
+                .toString(),
+              collateralAsset: loan.cryptoBalance.asset,
+              collateralNetwork: loan.cryptoBalance.network,
+            }))}
+            conversions={conversions.map((conversion) => ({
+              id: conversion.id,
+              reference: conversion.reference,
+              asset: conversion.asset,
+              network: conversion.network,
+              cryptoAmount: conversion.cryptoAmount.toString(),
+              payoutAmount: conversion.payoutAmount.toString(),
+              payoutCurrency: conversion.payoutCurrency,
+              bankName: conversion.bankName,
+              accountName: conversion.accountName,
+              accountNumberLast4: conversion.accountNumberLast4,
+              status: conversion.status,
+              quoteExpiresAt: conversion.quoteExpiresAt.toISOString(),
+              createdAt: conversion.createdAt.toISOString(),
+            }))}
+          />
+</div>
+      <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-5">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-3">
+        <SectionHeader title="Assets" />
 
         <div className="divide-y divide-slate-100">
           {CRYPTO_OPTIONS.map((crypto) => {
@@ -409,10 +451,23 @@ export default async function CryptoDashboardPage() {
             return (
               <div
                 key={`${crypto.asset}:${crypto.network}`}
-                className="flex items-center gap-3 px-4 py-3.5 transition hover:bg-slate-50 sm:px-5"
+                className="group flex items-center gap-3 px-4 py-4 transition-colors hover:bg-slate-50/80 sm:gap-4 sm:px-5"
               >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-                  <Icon className="h-4 w-4" />
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-100 bg-white shadow-sm">
+                  {crypto.asset !== "TRN" ? (
+                    <img
+                      src={`https://assets.coincap.io/assets/icons/${crypto.asset === "BTC" ? "btc" : crypto.asset === "ETH" ? "eth" : crypto.asset === "SOL" ? "sol" : crypto.asset === "USDT" ? "usdt" : crypto.asset === "USDC" ? "usdc" : "xlm"}@2x.png`}
+                      alt={`${crypto.asset} logo`}
+                      width={44}
+                      height={44}
+                      className="h-full w-full object-contain"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center bg-rose-50 text-xs font-bold text-rose-700">
+                      TRN
+                    </span>
+                  )}
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -421,7 +476,7 @@ export default async function CryptoDashboardPage() {
                       {crypto.asset}
                     </p>
 
-                    <span className="text-xs text-slate-400">
+                    <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
                       {crypto.networkLabel}
                     </span>
                   </div>
@@ -436,7 +491,7 @@ export default async function CryptoDashboardPage() {
                   </p>
 
                   {usdValue !== null && (
-                    <p className="mt-0.5 text-xs text-slate-400">
+                    <p className="mt-1 text-xs font-medium text-slate-500">
                       {formatUsd(usdValue)}
                     </p>
                   )}
@@ -447,31 +502,15 @@ export default async function CryptoDashboardPage() {
         </div>
       </section>
 
-      {/* Deposit form */}
-      <section
-        id="crypto-deposit"
-        className="rounded-xl border border-slate-200 bg-white"
-      >
-        <SectionHeader
-          title="Deposit"
-          description="Choose an asset and network to receive crypto."
-        />
-
-        <div className="px-4 py-4 sm:px-5">
-          <CryptoDepositForm />
-        </div>
-      </section>
-
-      {/* Recent activity */}
-      <section className="rounded-xl border border-slate-200 bg-white">
-        <SectionHeader
-          title="Recent crypto activity"
-          description="Your latest deposits and withdrawals."
-        />
+      <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-2">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-4 text-sm font-semibold text-slate-800 outline-none transition-colors hover:text-emerald-800 focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-inset sm:px-5 [&::-webkit-details-marker]:hidden">
+          <span>Activity</span>
+          <span className="text-xs font-medium text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true">⌄</span>
+        </summary>
 
         {recentActivity.length === 0 ? (
           <div className="px-5 py-8 text-center">
-            <p className="text-sm text-slate-400">
+            <p className="text-sm font-medium text-slate-700">
               No crypto activity yet.
             </p>
           </div>
@@ -480,7 +519,15 @@ export default async function CryptoDashboardPage() {
             {recentActivity.map((activity) => (
               <div
                 key={activity.id}
-                className="flex items-center gap-3 px-4 py-3.5 sm:px-5"
+                title={[
+                  activity.destinationAddress
+                    ? `To ${activity.destinationAddress}`
+                    : null,
+                  activity.transactionHash
+                    ? `Transaction: ${activity.transactionHash}`
+                    : null,
+                ].filter(Boolean).join(" \u00B7 ") || undefined}
+                className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-slate-50/80 sm:px-4"
               >
                 <div
                   className={[
@@ -511,21 +558,9 @@ export default async function CryptoDashboardPage() {
                   </div>
 
                   <p className="mt-0.5 truncate text-xs text-slate-400">
-                    {activity.network} ·{" "}
+                    {activity.network}{" \u00B7 "}
                     {formatDate(activity.createdAt)}
                   </p>
-
-                  {activity.destinationAddress && (
-                    <p className="mt-0.5 truncate text-xs text-slate-400">
-                      To {activity.destinationAddress}
-                    </p>
-                  )}
-
-                  {activity.transactionHash && (
-                    <p className="mt-0.5 max-w-60 truncate font-mono text-[10px] text-slate-300">
-                      {activity.transactionHash}
-                    </p>
-                  )}
                 </div>
 
                 <div className="shrink-0 text-right">
@@ -537,7 +572,7 @@ export default async function CryptoDashboardPage() {
                   </p>
 
                   {activity.usdAmount !== null && (
-                    <p className="mt-0.5 text-xs text-slate-400">
+                    <p className="mt-1 text-xs font-medium text-slate-500">
                       {formatUsd(activity.usdAmount)}
                     </p>
                   )}
@@ -554,29 +589,18 @@ export default async function CryptoDashboardPage() {
             ))}
           </div>
         )}
-      </section>
+      </details>
+      </div>
     </div>
   );
 }
 
-function SectionHeader({
-  title,
-  description,
-}: {
-  title: string;
-  description?: string;
-}) {
+function SectionHeader({ title }: { title: string }) {
   return (
-    <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
-      <h2 className="text-sm font-semibold text-slate-900">
+    <div className="border-b border-slate-100 bg-white px-4 py-3.5 sm:px-5">
+      <h2 className="text-sm font-semibold tracking-tight text-slate-900">
         {title}
       </h2>
-
-      {description && (
-        <p className="mt-0.5 text-xs text-slate-400">
-          {description}
-        </p>
-      )}
     </div>
   );
 }

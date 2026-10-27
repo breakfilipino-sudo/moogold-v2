@@ -5,8 +5,8 @@ import {
   AlertTriangle,
   ArrowUpRight,
   CheckCircle2,
-  CircleDollarSign,
   Clock3,
+  ChevronDown,
   Copy,
   Loader2,
   ShieldCheck,
@@ -121,6 +121,7 @@ export default function CryptoWithdrawalForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [historyExpanded, setHistoryExpanded] = useState(false);
 
   const selectedBalance = useMemo(
     () => balances.find((balance) => balance.asset === asset) ?? null,
@@ -248,10 +249,10 @@ export default function CryptoWithdrawalForm({
   return (
     <div className="space-y-4">
       {/* Balance */}
-      <section className="rounded-xl border border-slate-200 bg-white">
+      <section className="rounded-2xl border border-emerald-100 bg-white shadow-[0_16px_40px_-30px_rgba(6,95,70,0.35)]">
         <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-sm text-slate-500">
               Total crypto value
             </p>
 
@@ -259,12 +260,12 @@ export default function CryptoWithdrawalForm({
               {formatUsd(totalCryptoUsd)}
             </p>
 
-            <p className="mt-0.5 text-[10px] text-slate-400">
+            <p className="mt-0.5 text-sm text-slate-400">
               Current market value of your holdings
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-[11px] text-slate-500">
+          <div className="flex items-center gap-2 text-sm text-slate-500">
             <ShieldCheck className="h-4 w-4 text-emerald-600" />
             Secure withdrawal
           </div>
@@ -272,27 +273,27 @@ export default function CryptoWithdrawalForm({
       </section>
 
       {/* Withdrawal form */}
-      <section className="rounded-xl border border-slate-200 bg-white">
+      <section className="rounded-2xl border border-emerald-100 bg-white shadow-[0_16px_40px_-30px_rgba(6,95,70,0.35)]">
         <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
           <h2 className="text-sm font-semibold text-slate-900">
             Withdrawal details
           </h2>
 
-          <p className="mt-0.5 text-[10px] text-slate-400">
+          <p className="mt-0.5 text-sm text-slate-400">
             Select an asset, enter the amount and destination wallet.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5 px-4 py-4 sm:px-5">
           {error && (
-            <div className="flex gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-xs leading-5 text-red-700">
+            <div className="flex gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-sm leading-5 text-red-700">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
               <span>{error}</span>
             </div>
           )}
 
           {success && (
-            <div className="flex gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs leading-5 text-emerald-700">
+            <div className="flex gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm leading-5 text-emerald-700">
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
               <span>{success}</span>
             </div>
@@ -300,87 +301,51 @@ export default function CryptoWithdrawalForm({
 
           {/* Asset */}
           <div>
-            <label className="text-xs font-medium text-slate-700">
+            <label htmlFor="withdrawal-asset" className="text-sm font-semibold text-slate-800">
               Cryptocurrency
             </label>
-
-            <div className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-200">
-              {balances.map((balance) => {
-                const selected = balance.asset === asset;
-
-                return (
-                  <button
-                    key={balance.id}
-                    type="button"
-                    onClick={() => {
-                      setAsset(balance.asset);
-                      setAmount("");
-                      setError("");
-                      setSuccess("");
-                    }}
-                    disabled={isSubmitting}
-                    className={[
-                      "flex w-full items-center gap-3 px-3 py-3 text-left transition",
-                      selected
-                        ? "bg-emerald-50/70"
-                        : "bg-white hover:bg-slate-50",
-                      "first:rounded-t-lg last:rounded-b-lg",
-                      "disabled:cursor-not-allowed disabled:opacity-60",
-                    ].join(" ")}
-                  >
-                    <div
-                      className={[
-                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                        selected
-                          ? "bg-emerald-100 text-emerald-600"
-                          : "bg-slate-100 text-slate-500",
-                      ].join(" ")}
-                    >
-                      <CircleDollarSign className="h-4 w-4" />
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-semibold text-slate-900">
-                          {balance.asset}
-                        </p>
-
-                        <span className="truncate text-[10px] text-slate-400">
-                          {NETWORK_LABELS[balance.network] ??
-                            balance.network}
-                        </span>
-                      </div>
-
-                      <p className="mt-0.5 text-[10px] text-slate-500">
-                        Available: {formatAmount(balance.balance)}{" "}
-                        {balance.asset}
-                      </p>
-                    </div>
-
-                    {selected && (
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                    )}
-                  </button>
-                );
-              })}
-
-              {balances.length === 0 && (
-                <div className="px-4 py-5 text-center">
-                  <p className="text-xs text-amber-700">
-                    You do not currently have any crypto balances available
-                    for withdrawal.
-                  </p>
-                </div>
-              )}
+            <div className="relative mt-2">
+              <select
+                id="withdrawal-asset"
+                value={asset}
+                onChange={(event) => {
+                  setAsset(event.target.value);
+                  setAmount("");
+                  setError("");
+                  setSuccess("");
+                }}
+                disabled={isSubmitting || balances.length === 0}
+                className="h-12 w-full appearance-none rounded-2xl border border-emerald-100 bg-white shadow-[0_16px_40px_-30px_rgba(6,95,70,0.35)] px-4 pr-11 text-base font-semibold text-slate-900 shadow-sm outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 disabled:cursor-not-allowed disabled:bg-slate-50"
+              >
+                {balances.length === 0 ? (
+                  <option value="">No crypto balances available</option>
+                ) : (
+                  balances.map((balance) => (
+                    <option key={balance.id} value={balance.asset}>
+                      {balance.asset} - {NETWORK_LABELS[balance.network] ?? balance.network}
+                    </option>
+                  ))
+                )}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             </div>
+            {selectedBalance && (
+              <p className="mt-2 text-sm text-slate-500">
+                Available: <span className="font-semibold text-slate-800">{formatAmount(selectedBalance.balance)} {selectedBalance.asset}</span>
+              </p>
+            )}
+            {balances.length === 0 && (
+              <p className="mt-2 text-sm text-slate-500">
+                You do not currently have any crypto balances available for withdrawal.
+              </p>
+            )}
           </div>
-
           {/* Amount */}
           <div>
             <div className="flex items-center justify-between gap-4">
               <label
                 htmlFor="withdrawal-amount"
-                className="text-xs font-medium text-slate-700"
+                className="text-sm font-medium text-slate-700"
               >
                 Amount
               </label>
@@ -389,7 +354,7 @@ export default function CryptoWithdrawalForm({
                 type="button"
                 onClick={selectMax}
                 disabled={!selectedBalance || isSubmitting}
-                className="text-[10px] font-semibold text-emerald-600 transition hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="text-sm font-semibold text-emerald-600 transition hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 MAX
               </button>
@@ -415,12 +380,12 @@ export default function CryptoWithdrawalForm({
                 ].join(" ")}
               />
 
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500">
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500">
                 {asset || "CRYPTO"}
               </span>
             </div>
 
-            <div className="mt-2 flex items-center justify-between gap-3 text-[10px] text-slate-400">
+            <div className="mt-2 flex items-center justify-between gap-3 text-sm text-slate-400">
               <span>Available balance</span>
 
               <span
@@ -435,7 +400,7 @@ export default function CryptoWithdrawalForm({
             </div>
 
             {amountExceedsBalance && (
-              <div className="mt-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-[10px] leading-4 text-red-700">
+              <div className="mt-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm leading-4 text-red-700">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>{amountError}</span>
               </div>
@@ -446,7 +411,7 @@ export default function CryptoWithdrawalForm({
           <div>
             <label
               htmlFor="destination-address"
-              className="text-xs font-medium text-slate-700"
+              className="text-sm font-medium text-slate-700"
             >
               Destination wallet address
             </label>
@@ -463,10 +428,10 @@ export default function CryptoWithdrawalForm({
               placeholder="Enter the wallet address you want to send your crypto to"
               rows={3}
               disabled={isSubmitting}
-              className="mt-2 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs leading-5 text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-2 w-full resize-none rounded-xl border border-slate-200 bg-white shadow-sm transition focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10 px-3 py-3 text-sm leading-5 text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-60"
             />
 
-            <p className="mt-1.5 text-[10px] leading-4 text-slate-400">
+            <p className="mt-1.5 text-sm leading-4 text-slate-400">
               Make sure the address supports the selected network.
             </p>
           </div>
@@ -482,7 +447,7 @@ export default function CryptoWithdrawalForm({
               amountExceedsBalance ||
               !destinationAddress.trim()
             }
-            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-800 to-emerald-600 px-5 text-base font-semibold text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting ? (
               <>
@@ -492,7 +457,7 @@ export default function CryptoWithdrawalForm({
             ) : (
               <>
                 <ArrowUpRight className="h-4 w-4" />
-                Submit Withdrawal
+                Withdraw
               </>
             )}
           </button>
@@ -500,7 +465,7 @@ export default function CryptoWithdrawalForm({
           <div className="flex items-start gap-2 border-t border-slate-100 pt-4">
             <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
 
-            <p className="text-[10px] leading-4 text-slate-400">
+            <p className="text-sm leading-4 text-slate-400">
               Review the cryptocurrency, network, amount and destination
               address carefully before submitting. Your request will be
               reviewed before processing.
@@ -510,30 +475,38 @@ export default function CryptoWithdrawalForm({
       </section>
 
       {/* Withdrawal history */}
-      <section className="rounded-xl border border-slate-200 bg-white">
-        <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 sm:px-5">
-          <Clock3 className="h-4 w-4 text-slate-400" />
-
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900">
-              Withdrawal history
-            </h2>
-
-            <p className="text-[10px] text-slate-400">
-              Your recent crypto withdrawal requests.
-            </p>
-          </div>
-        </div>
-
+      <section className="rounded-2xl border border-emerald-100 bg-white shadow-[0_16px_40px_-30px_rgba(6,95,70,0.35)]">
+        <button
+          type="button"
+          aria-expanded={historyExpanded}
+          aria-controls="crypto-withdrawal-history-content"
+          onClick={() => setHistoryExpanded((expanded) => !expanded)}
+          className="flex w-full items-center justify-between gap-3 rounded-t-xl px-4 py-4 text-left transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600"
+        >
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+              <Clock3 className="h-5 w-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-slate-900">Withdrawal history</span>
+              <span className="mt-1 block text-sm text-slate-500">
+                {withdrawalHistory.length} {withdrawalHistory.length === 1 ? "request" : "requests"} - {historyExpanded ? "Hide history" : "View history"}
+              </span>
+            </span>
+          </span>
+          <ChevronDown className={`h-5 w-5 shrink-0 text-slate-500 transition-transform ${historyExpanded ? "rotate-180" : ""}`} />
+        </button>
+        {historyExpanded && (
+          <div id="crypto-withdrawal-history-content" className="border-t border-slate-100">
         {withdrawalHistory.length === 0 ? (
           <div className="px-5 py-8 text-center">
             <WalletCards className="mx-auto h-5 w-5 text-slate-300" />
 
-            <p className="mt-2 text-xs font-medium text-slate-600">
+            <p className="mt-2 text-sm font-medium text-slate-600">
               No crypto withdrawals yet.
             </p>
 
-            <p className="mt-1 text-[10px] text-slate-400">
+            <p className="mt-1 text-sm text-slate-400">
               Your withdrawal requests will appear here.
             </p>
           </div>
@@ -572,24 +545,24 @@ export default function CryptoWithdrawalForm({
 
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-xs font-semibold text-slate-900">
+                          <p className="text-sm font-semibold text-slate-900">
                             {withdrawal.amount} {withdrawal.asset}
                           </p>
 
-                          <span className="text-[10px] text-slate-400">
+                          <span className="text-sm text-slate-400">
                             {NETWORK_LABELS[withdrawal.network] ??
                               withdrawal.network}
                           </span>
                         </div>
 
-                        <p className="mt-0.5 text-[10px] text-slate-400">
+                        <p className="mt-0.5 text-sm text-slate-400">
                           {formatDate(withdrawal.createdAt)}
                         </p>
                       </div>
                     </div>
 
                     <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-medium ${getStatusClasses(
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-sm font-medium ${getStatusClasses(
                         status,
                       )}`}
                     >
@@ -599,12 +572,12 @@ export default function CryptoWithdrawalForm({
 
                   <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-3">
                     <div className="min-w-0">
-                      <p className="text-[10px] text-slate-400">
+                      <p className="text-sm text-slate-400">
                         Destination
                       </p>
 
                       <div className="mt-1 flex min-w-0 items-center gap-1.5">
-                        <p className="truncate text-[10px] font-medium text-slate-700">
+                        <p className="truncate text-sm font-medium text-slate-700">
                           {shortAddress(withdrawal.destinationAddress)}
                         </p>
 
@@ -622,22 +595,22 @@ export default function CryptoWithdrawalForm({
                     </div>
 
                     <div>
-                      <p className="text-[10px] text-slate-400">
+                      <p className="text-sm text-slate-400">
                         Network fee
                       </p>
 
-                      <p className="mt-1 text-[10px] font-medium text-slate-700">
+                      <p className="mt-1 text-sm font-medium text-slate-700">
                         {formatAmount(withdrawal.fee)}{" "}
                         {withdrawal.asset}
                       </p>
                     </div>
 
                     <div>
-                      <p className="text-[10px] text-slate-400">
+                      <p className="text-sm text-slate-400">
                         Total deducted
                       </p>
 
-                      <p className="mt-1 text-[10px] font-medium text-slate-700">
+                      <p className="mt-1 text-sm font-medium text-slate-700">
                         {formatAmount(withdrawal.totalAmount)}{" "}
                         {withdrawal.asset}
                       </p>
@@ -645,7 +618,7 @@ export default function CryptoWithdrawalForm({
                   </div>
 
                   {withdrawal.rejectionReason && (
-                    <div className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2.5 text-[10px] leading-4 text-red-700">
+                    <div className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2.5 text-sm leading-4 text-red-700">
                       <span className="font-semibold">
                         Rejection reason:
                       </span>{" "}
@@ -655,6 +628,9 @@ export default function CryptoWithdrawalForm({
                 </div>
               );
             })}
+          </div>
+        )}
+
           </div>
         )}
       </section>

@@ -1,4 +1,4 @@
-import { createServerClient } from "@supabase/ssr";
+﻿import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function updateSession(request: NextRequest) {
@@ -92,9 +92,14 @@ export async function updateSession(request: NextRequest) {
    * The result can contain null data, so handle that
    * explicitly instead of destructuring data.claims.
    */
+  const claimsStartedAt = Date.now();
   const { data, error } =
     await supabase.auth.getClaims();
 
+
+  console.log(
+    `[auth-timing] Middleware getClaims: ${Date.now() - claimsStartedAt}ms route=${pathname}`,
+  );
   const claims = data?.claims ?? null;
 
   /*

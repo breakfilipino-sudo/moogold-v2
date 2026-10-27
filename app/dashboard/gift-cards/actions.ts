@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -131,6 +131,81 @@ function isPrismaUniqueConstraintError(error: unknown) {
     (error as { code?: unknown }).code === "P2002"
   );
 }
+
+
+export async function getGiftCardRedemptionStatus(
+  submissionId: string,
+) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user: authUser },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !authUser) {
+      return {
+        success: false as const,
+        error: "Your session has expired. Please sign in again.",
+      };
+    }
+
+    if (
+      typeof submissionId !== "string" ||
+      !submissionId.trim()
+    ) {
+      return {
+        success: false as const,
+        error: "Invalid redemption reference.",
+      };
+    }
+
+    const dbUser = await prisma.user.findUnique({
+      where: {
+        authUserId: authUser.id,
+      },
+      select: { id: true },
+    });
+
+    if (!dbUser) {
+      return {
+        success: false as const,
+        error: "Your account could not be verified.",
+      };
+    }
+
+    const submission =
+      await prisma.giftCardSubmission.findFirst({
+        where: {
+          id: submissionId,
+          userId: dbUser.id,
+        },
+        select: {
+          status: true,
+          rejectionReason: true,
+        },
+      });
+
+    if (!submission) {
+      return {
+        success: false as const,
+        error: "Redemption could not be found.",
+      };
+    }
+
+    return {
+      success: true as const,
+      status: submission.status,
+      rejectionReason: submission.rejectionReason,
+    };
+  } catch {
+    return {
+      success: false as const,
+      error: "Unable to check redemption status. Please try again.",
+    };
+  }
+}
+
 
 async function removeUploadedFiles(
   supabaseAdmin: ReturnType<typeof createAdminClient>,

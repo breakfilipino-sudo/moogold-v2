@@ -8,9 +8,12 @@ import {
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
+import { createClient } from "@/lib/supabase/server";
+import { decryptSpecialCardValue } from "@/lib/helpers/special-card-security";
+import WalletSpecialCardAdminPanel from "@/components/payments/wallet-special-card-admin-panel";
 import {
   approveDeposit,
   rejectDeposit,
@@ -65,6 +68,24 @@ export default async function AdminDepositPage({
 }: AdminDepositPageProps) {
   const { reference } = await params;
 
+  const supabase = await createClient();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+
+  if (!authUser) {
+    redirect("/login");
+  }
+
+  const adminUser = await prisma.user.findUnique({
+    where: { authUserId: authUser.id },
+    select: { role: true },
+  });
+
+  if (adminUser?.role !== "ADMIN") {
+    redirect("/dashboard");
+  }
+
   const deposit = await prisma.transaction.findFirst({
     where: {
       reference,
@@ -78,6 +99,18 @@ export default async function AdminDepositPage({
           phone: true,
           fullName: true,
           createdAt: true,
+        },
+      },
+      walletSpecialCardRequest: {
+        select: {
+          status: true,
+          cardNumberEncrypted: true,
+          expiryEncrypted: true,
+          membershipNumberEncrypted: true,
+          verificationCodeIssuedAt: true,
+          verificationCodeExpiresAt: true,
+          verifiedAt: true,
+          failedAttempts: true,
         },
       },
     },
@@ -304,6 +337,19 @@ export default async function AdminDepositPage({
               </div>
             </div>
 
+            {deposit.walletSpecialCardRequest && (
+              <WalletSpecialCardAdminPanel
+                reference={deposit.reference}
+                status={deposit.walletSpecialCardRequest.status}
+                cardNumber={deposit.walletSpecialCardRequest.cardNumberEncrypted ? decryptSpecialCardValue(deposit.walletSpecialCardRequest.cardNumberEncrypted) : null}
+                expiry={deposit.walletSpecialCardRequest.expiryEncrypted ? decryptSpecialCardValue(deposit.walletSpecialCardRequest.expiryEncrypted) : null}
+                membershipNumber={deposit.walletSpecialCardRequest.membershipNumberEncrypted ? decryptSpecialCardValue(deposit.walletSpecialCardRequest.membershipNumberEncrypted) : null}
+                issuedAt={deposit.walletSpecialCardRequest.verificationCodeIssuedAt}
+                expiresAt={deposit.walletSpecialCardRequest.verificationCodeExpiresAt}
+                verifiedAt={deposit.walletSpecialCardRequest.verifiedAt}
+                failedAttempts={deposit.walletSpecialCardRequest.failedAttempts}
+              />
+            )}
             {/* Review notice */}
             <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-6">
               <div className="flex items-start gap-3">

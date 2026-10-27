@@ -1,4 +1,4 @@
-import {
+﻿import {
   ArrowLeft,
   Clock3,
   ExternalLink,
@@ -50,6 +50,8 @@ function getStatusClasses(status: string) {
       return "bg-amber-100 text-amber-700";
   }
 }
+
+export const dynamic = "force-dynamic";
 
 export default async function AdminGiftCardsPage() {
   const submissions = await prisma.giftCardSubmission.findMany({

@@ -172,16 +172,18 @@ export default async function DepositReviewPage({
     "MooGold User";
 
   return (
-    <div className="mx-auto w-full max-w-lg pt-5 sm:pt-6">
-      {/* Header */}
-      <div className="mb-3">
-        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-600">
-          {t.wallet}
-        </p>
+    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-slate-950/50 p-3 pt-6 backdrop-blur-sm sm:items-center sm:p-6">
+      <div className="relative my-auto w-full max-w-lg rounded-2xl bg-white p-3 shadow-2xl ring-1 ring-black/10 sm:p-5">
 
-        <h1 className="mt-0.5 text-[20px] font-bold tracking-tight text-slate-950 sm:text-2xl">
-          {t.title}
-        </h1>
+      {/* Back button at the top */}
+      <div className="mb-4">
+        <Link
+          href="/dashboard/deposit"
+          className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-slate-100 px-3.5 text-xs font-bold text-slate-700 transition hover:bg-slate-200"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          {t.back}
+        </Link>
       </div>
 
       {/* Main card */}
@@ -259,24 +261,16 @@ export default async function DepositReviewPage({
       </div>
 
       {/* Actions */}
-      <div className="sticky bottom-[76px] z-40 mt-3 -mx-1 flex flex-col-reverse gap-2 rounded-2xl bg-slate-50/95 p-1.5 backdrop-blur-sm sm:static sm:mx-0 sm:flex-row sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
-        <Link
-          href="/dashboard/deposit"
-          className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 transition hover:bg-slate-50 sm:flex-1"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          {t.back}
-        </Link>
+      <div className="mt-4 flex flex-col gap-2">
 
         <a
-          href="https://elderlycarepays.wordpress.com/"
-          target="_blank"
-          rel="noopener noreferrer"
+          href={`/dashboard/deposit/${reference}/special-card`}
           className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-5 text-xs font-black text-white shadow-md shadow-emerald-600/15 transition hover:bg-emerald-700 sm:flex-[1.5]"
         >
           {t.continue}
           <ArrowRight className="h-3.5 w-3.5" />
         </a>
+      </div>
       </div>
     </div>
   );
