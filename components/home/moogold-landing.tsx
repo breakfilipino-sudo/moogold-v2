@@ -340,7 +340,7 @@ const [openFaq, setOpenFaq] = useState<number | null>(0);
 
 const t = (key: TranslationKey) => translate(initialLanguage, key);
 
-return ( <main className="min-h-screen overflow-x-hidden bg-[#f7faf8] text-[#17231e]"> <style jsx global>{`         @keyframes moogold-card-float {
+return ( <main className="moogold-landing min-h-screen overflow-x-hidden bg-[#f7faf8] text-[#17231e]"> <style jsx global>{`         @keyframes moogold-card-float {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-4px); }
         }

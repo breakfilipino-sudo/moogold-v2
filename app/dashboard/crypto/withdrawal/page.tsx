@@ -156,7 +156,6 @@ export default async function CryptoWithdrawalPage() {
       </div>
 
       <CryptoWithdrawalForm
-        totalCryptoUsd={totalCryptoUsd}
         balances={balances.map((balance) => ({
           id: balance.id,
           asset: balance.asset,

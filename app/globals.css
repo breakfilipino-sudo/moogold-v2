@@ -535,3 +535,50 @@ html.dark {
 body:has(.registration-page-offwhite) {
   background-color: #eef3f0;
 }
+/* MooGold landing page: improve contrast only when dark mode is active. */
+.dark .moogold-landing {
+  background-color: #0b1511 !important;
+  color: #e5eee9 !important;
+}
+
+.dark .moogold-landing [class*="bg-[#f7faf8]"],
+.dark .moogold-landing [class~="bg-white"],
+.dark .moogold-landing [class~="bg-[#fcfaf5]"],
+.dark .moogold-landing [class~="bg-[#f1f6f3]"],
+.dark .moogold-landing [class~="bg-[#edf7f2]"],
+.dark .moogold-landing [class~="bg-[#f5f2e9]"],
+.dark .moogold-landing [class~="bg-[#eef1fa]"],
+.dark .moogold-landing [class~="bg-[#f2f6f3]"],
+.dark .moogold-landing [class~="bg-[#f5f0df]"],
+.dark .moogold-landing [class~="bg-[#fbfcfb]"],
+.dark .moogold-landing [class~="bg-[#f4f8f5]"] {
+  background-color: #18251f !important;
+}
+
+.dark .moogold-landing [class~="text-[#17231e]"],
+.dark .moogold-landing [class~="text-[#10251d]"],
+.dark .moogold-landing [class~="text-[#26362f]"],
+.dark .moogold-landing [class~="text-[#25352e]"],
+.dark .moogold-landing [class~="text-[#24352d]"],
+.dark .moogold-landing [class~="text-[#263a31]"],
+.dark .moogold-landing [class~="text-[#30291b]"],
+.dark .moogold-landing [class~="text-[#52605a]"] {
+  color: #e5eee9 !important;
+}
+
+.dark .moogold-landing [class~="text-[#64726b]"],
+.dark .moogold-landing [class~="text-[#69766f]"],
+.dark .moogold-landing [class~="text-[#7d8983]"],
+.dark .moogold-landing [class~="text-[#7e8b84]"],
+.dark .moogold-landing [class~="text-[#89958f]"],
+.dark .moogold-landing [class~="text-[#9aa49f]"],
+.dark .moogold-landing [class~="text-[#8a9690]"] {
+  color: #b0c0b7 !important;
+}
+
+.dark .moogold-landing [class*="border-[#e4ebe7]"],
+.dark .moogold-landing [class*="border-[#e6ece8]"],
+.dark .moogold-landing [class*="border-[#e8eee9]"],
+.dark .moogold-landing [class*="border-[#dfe8e2]"] {
+  border-color: #34483e !important;
+}

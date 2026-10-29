@@ -209,11 +209,10 @@ export default function CryptoActionModals({
       {activeModal === "withdraw" && (
         <Modal
           title="Withdraw crypto"
-          description="Send crypto to an external wallet. Requests remain subject to review."
+          description="Send crypto to an external wallet."
           onClose={closeModal}
         >
           <CryptoWithdrawalForm
-            totalCryptoUsd={totalCryptoUsd}
             balances={withdrawalBalances}
             withdrawalHistory={withdrawalHistory}
           />

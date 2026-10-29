@@ -39,7 +39,6 @@ type Withdrawal = {
 type Props = {
   balances: Balance[];
   withdrawalHistory: Withdrawal[];
-  totalCryptoUsd: number;
 };
 
 const NETWORK_LABELS: Record<string, string> = {
@@ -59,15 +58,6 @@ function formatAmount(value: string) {
 
   return number.toLocaleString("en-US", {
     maximumFractionDigits: 8,
-  });
-}
-
-function formatUsd(value: number) {
-  return value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
   });
 }
 
@@ -112,8 +102,7 @@ function getStatusClasses(status: string) {
 export default function CryptoWithdrawalForm({
   balances,
   withdrawalHistory,
-  totalCryptoUsd,
-}: Props) {
+  }: Props) {
   const [asset, setAsset] = useState(balances[0]?.asset ?? "");
   const [amount, setAmount] = useState("");
   const [destinationAddress, setDestinationAddress] = useState("");
@@ -248,30 +237,6 @@ export default function CryptoWithdrawalForm({
 
   return (
     <div className="space-y-4">
-      {/* Balance */}
-      <section className="rounded-2xl border border-emerald-100 bg-white shadow-[0_16px_40px_-30px_rgba(6,95,70,0.35)]">
-        <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div>
-            <p className="text-sm text-slate-500">
-              Total crypto value
-            </p>
-
-            <p className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
-              {formatUsd(totalCryptoUsd)}
-            </p>
-
-            <p className="mt-0.5 text-sm text-slate-400">
-              Current market value of your holdings
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <ShieldCheck className="h-4 w-4 text-emerald-600" />
-            Secure withdrawal
-          </div>
-        </div>
-      </section>
-
       {/* Withdrawal form */}
       <section className="rounded-2xl border border-emerald-100 bg-white shadow-[0_16px_40px_-30px_rgba(6,95,70,0.35)]">
         <div className="border-b border-slate-100 px-4 py-3 sm:px-5">

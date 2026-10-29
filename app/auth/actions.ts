@@ -13,6 +13,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { prisma } from "@/lib/prisma";
 import { provisionUser } from "@/lib/auth/provision-user";
 import {
+  COUNTRIES,
   normalizePhone,
   isPlausibleMobilePhone,
   getPhoneValidationMessage,
@@ -836,13 +837,29 @@ export async function signInWithPin(
     };
   }
 
-  const phoneResult =
-    normalizePhone(phoneInput);
+  const isInternationalInput = phoneInput.trim().startsWith("+");
 
-  if (!phoneResult) {
+  const phoneCandidates = isInternationalInput
+    ? [normalizePhone(phoneInput)].flatMap((candidate) =>
+        candidate ? [candidate] : [],
+      )
+    : COUNTRIES.flatMap((country) => {
+        const candidate = normalizePhone(phoneInput, country.code);
+        return candidate ? [candidate] : [];
+      });
+
+  const uniquePhoneCandidates = Array.from(
+    new Map(
+      phoneCandidates.map((candidate) => [
+        `${candidate.phone}:${candidate.countryCode}`,
+        candidate,
+      ]),
+    ).values(),
+  );
+
+  if (uniquePhoneCandidates.length === 0) {
     return {
-      error:
-        "Please enter a valid mobile number.",
+      error: "Please enter a valid mobile number.",
     };
   }
 
@@ -856,10 +873,11 @@ export async function signInWithPin(
   const prismaStartedAt =
     performance.now();
 
-  const user =
-    await prisma.user.findUnique({
+  const matchingUsers = await prisma.user.findMany({
       where: {
-        phone: phoneResult.phone,
+        phone: {
+          in: uniquePhoneCandidates.map((candidate) => candidate.phone),
+        },
       },
       select: {
         authUserId: true,
@@ -871,6 +889,23 @@ export async function signInWithPin(
         accountStatus: true,
       },
     });
+
+  const matchingAccounts = matchingUsers.filter((candidate) =>
+    uniquePhoneCandidates.some(
+      (phoneCandidate) =>
+        phoneCandidate.phone === candidate.phone &&
+        phoneCandidate.countryCode === candidate.countryCode,
+    ),
+  );
+
+  if (matchingAccounts.length > 1) {
+    return {
+      error:
+        "More than one account matches this local number. Enter your number with its country code.",
+    };
+  }
+
+  const user = matchingAccounts[0] ?? null;
 
   console.log(
     `[login-timing] prisma user lookup: ${Math.round(

@@ -506,9 +506,6 @@ export default function CryptoFinancePanel({
                     {principalError}
                   </p>
                 )}
-                <p className="mt-1.5 text-sm leading-5 text-slate-500">
-                  Minimum $1,000 · Maximum $50,000,000 USD.
-                </p>
               </div>
 
               <div>
