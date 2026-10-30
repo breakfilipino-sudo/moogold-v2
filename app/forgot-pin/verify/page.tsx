@@ -20,43 +20,21 @@ import {
   requestPinResetOtp,
   verifyPinResetOtp,
 } from "@/app/auth/actions";
+import { getCountry } from "@/lib/phone";
 
 const MAX_REQUESTS = 3;
 const RESEND_SECONDS = 60;
 const LOCK_SECONDS = 300;
 
-function formatPhone(value: string) {
-  if (value.startsWith("+60")) {
-    return value.replace(
-      /^(\+60)(\d{2})(\d+)?$/,
-      "$1 $2 $3",
-    );
+function formatPhone(value: string, countryCode: string) {
+  const country = getCountry(countryCode);
+
+  if (!country || !value.startsWith(country.dialCode)) {
+    return value;
   }
 
-  if (value.startsWith("+63")) {
-    return value.replace(
-      /^(\+63)(\d{3})(\d+)?$/,
-      "$1 $2 $3",
-    );
-  }
-
-  if (value.startsWith("+65")) {
-    return value.replace(
-      /^(\+65)(\d{4})(\d{4})$/,
-      "$1 $2 $3",
-    );
-  }
-
-  if (value.startsWith("+66")) {
-    return value.replace(
-      /^(\+66)(\d{2})(\d+)?$/,
-      "$1 $2 $3",
-    );
-  }
-
-  return value;
+  return `${country.dialCode} ${value.slice(country.dialCode.length)}`;
 }
-
 export default function ForgotPinVerifyPage() {
   return (
     <Suspense
@@ -75,6 +53,7 @@ function ForgotPinVerifyContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const phone = searchParams.get("phone") ?? "";
+  const countryCode = searchParams.get("countryCode") ?? "NG";
 
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -321,8 +300,9 @@ function ForgotPinVerifyContent() {
 
       formData.set("phone", phone);
 
-      const result =
-        await requestPinResetOtp(formData);
+      formData.set("countryCode", countryCode);
+
+      const result = await requestPinResetOtp(formData);
 
       if (result?.error) {
         setError(result.error);
@@ -383,7 +363,7 @@ function ForgotPinVerifyContent() {
             </p>
 
             <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">
-              {formatPhone(phone)}
+              {formatPhone(phone, countryCode)}
             </p>
           </div>
 

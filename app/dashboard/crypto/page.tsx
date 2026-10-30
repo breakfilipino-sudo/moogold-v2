@@ -1,4 +1,4 @@
-﻿import {
+import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Bitcoin,
@@ -356,9 +356,7 @@ export default async function CryptoDashboardPage() {
               {formatUsd(totalUsd)}
             </p>
 
-            <p className="mt-1 text-xs text-emerald-100/80">
-              Current market value
-            </p>
+            
           </div>
 
 

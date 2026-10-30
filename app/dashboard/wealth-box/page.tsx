@@ -285,7 +285,7 @@ export default async function WealthBoxPage() {
               Wealth Box
             </h1>
             <p className="text-xs font-medium text-slate-500">
-              Grow your money. Earn daily profits seamlessly.
+              Grow your money.
             </p>
           </div>
         </div>
@@ -296,7 +296,7 @@ export default async function WealthBoxPage() {
         <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
         <div className="absolute -left-10 -bottom-10 h-48 w-48 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative z-10 flex flex-row items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold tracking-wide text-emerald-300 backdrop-blur-md">
               <TrendingUp className="h-3.5 w-3.5" />
@@ -310,8 +310,7 @@ export default async function WealthBoxPage() {
               )}
             </p>
 
-            {activeInvestment && activePlanDurationDays > 0 ? (
-              <div className="mt-2.5 flex items-center gap-2 text-xs font-semibold text-emerald-200/90">
+            {activeInvestment && activePlanDurationDays > 0 && (<div className="mt-2.5 flex items-center gap-2 text-xs font-semibold text-emerald-200/90">
                 <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span>
                   Earned +{formatLocalAmount(
@@ -319,12 +318,7 @@ export default async function WealthBoxPage() {
                     localCurrency,
                   )} ({activePlanDurationDays}-day growth plan)
                 </span>
-              </div>
-            ) : (
-              <p className="mt-2 text-xs text-slate-400">
-                No active earnings locked yet. Select a plan below to begin.
-              </p>
-            )}
+              </div>)}
           </div>
 
           <div className="flex shrink-0 items-center">

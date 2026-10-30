@@ -44,6 +44,7 @@
                     "node_modules",
                     "recovery-backup-20261009",
                     "backups",
-                    "tools/postgresql-17"
+                    "tools/postgresql-17",
+                    "targeted-fix-backups"
                 ]
 }

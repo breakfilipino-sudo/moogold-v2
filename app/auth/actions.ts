@@ -19,6 +19,7 @@ import {
   getPhoneValidationMessage,
   type SupportedCountry,
 } from "@/lib/phone";
+import { isValidSubdivision } from "@/lib/country-subdivisions";
 import {
   hashPin,
   isValidPin,
@@ -102,6 +103,11 @@ type PendingRegistration = {
   lastName: string;
   fullName: string;
   dateOfBirth: string;
+  gender: "Male" | "Female" | "Other";
+  maritalStatus: "Single" | "Married" | "Divorced" | "Widowed";
+  addressLine1: string;
+  stateProvince: string;
+  referralCode?: string | null;
   issuedAt: number;
 };
 
@@ -149,6 +155,14 @@ function readPendingRegistration(
       typeof parsed.lastName !== "string" ||
       typeof parsed.fullName !== "string" ||
       typeof parsed.dateOfBirth !== "string" ||
+      !["Male", "Female", "Other"].includes(String(parsed.gender)) ||
+      !["Single", "Married", "Divorced", "Widowed"].includes(String(parsed.maritalStatus)) ||
+      typeof parsed.addressLine1 !== "string" ||
+      !parsed.addressLine1.trim() ||
+      parsed.addressLine1.length > 160 ||
+      typeof parsed.stateProvince !== "string" ||
+      !parsed.stateProvince.trim() ||
+      parsed.stateProvince.length > 100 ||
       typeof parsed.issuedAt !== "number" ||
       parsed.issuedAt > now + 60_000 ||
       now - parsed.issuedAt > REGISTRATION_PENDING_TTL_SECONDS * 1000
@@ -228,10 +242,24 @@ export async function requestRegistrationOtp(
   const lastName = getString(formData, "lastName").trim();
   const fullName = [firstName, lastName].filter(Boolean).join(" ");
   const dateOfBirth = getString(formData, "dateOfBirth");
+  const gender = getString(formData, "gender");
+  const maritalStatus = getString(formData, "maritalStatus");
+  const addressLine1 = getString(formData, "addressLine1").trim();
+  const stateProvince = getString(formData, "stateProvince").trim();
   const email = getString(formData, "email").trim().toLowerCase();
   const phoneInput = getString(formData, "phone");
   const countryInput = getString(formData, "countryCode").toUpperCase();
   const countryCode = countryInput as SupportedCountry;
+  const referralCodeInput = getString(formData, "referralCode")
+    .trim()
+    .toUpperCase();
+  if (referralCodeInput && !/^[A-Z0-9]{1,64}$/.test(referralCodeInput)) {
+    return {
+      error: "That referral code is not valid. Please check it and try again.",
+    };
+  }
+
+  const referralCode = referralCodeInput || null;
 
   if (
     !firstName ||
@@ -245,6 +273,22 @@ export async function requestRegistrationOtp(
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { error: "Please enter a valid email address." };
+  }
+
+  if (!["Male", "Female", "Other"].includes(gender)) {
+    return { error: "Please select your gender." };
+  }
+
+  if (!["Single", "Married", "Divorced", "Widowed"].includes(maritalStatus)) {
+    return { error: "Please select your marital status." };
+  }
+
+  if (!addressLine1 || addressLine1.length > 160) {
+    return { error: "Please enter your address." };
+  }
+
+  if (!stateProvince || stateProvince.length > 100) {
+    return { error: "Please select your state or province." };
   }
 
   const dob = new Date(`${dateOfBirth}T00:00:00.000Z`);
@@ -264,6 +308,10 @@ export async function requestRegistrationOtp(
 
   if (!phoneInput || !supportedCountries.includes(countryCode)) {
     return { error: "Please enter a valid mobile number and select your country." };
+  }
+
+  if (!isValidSubdivision(countryCode, stateProvince)) {
+    return { error: "Please select a valid state or province for your country." };
   }
 
   const phoneResult = normalizePhone(phoneInput, countryCode);
@@ -299,6 +347,19 @@ export async function requestRegistrationOtp(
     };
   }
 
+  if (referralCode) {
+    const referrer = await prisma.user.findUnique({
+      where: { referralCode },
+      select: { id: true },
+    });
+
+    if (!referrer) {
+      return {
+        error: "We couldn't find an account with that referral code. Please check it and try again.",
+      };
+    }
+  }
+
   const registrationSecret = process.env.MOOGOLD_AUTH_SECRET;
   if (!registrationSecret) {
     console.error("MOOGOLD_AUTH_SECRET is not configured.");
@@ -318,6 +379,10 @@ export async function requestRegistrationOtp(
         phone,
         countryCode,
         dateOfBirth,
+        gender,
+        maritalStatus,
+        addressLine1,
+        stateProvince,
       },
     },
   });
@@ -341,6 +406,11 @@ export async function requestRegistrationOtp(
     lastName,
     fullName,
     dateOfBirth,
+    gender: gender as PendingRegistration["gender"],
+    maritalStatus: maritalStatus as PendingRegistration["maritalStatus"],
+    addressLine1,
+    stateProvince,
+    referralCode,
     issuedAt: Date.now(),
   };
   const encodedPayload = Buffer.from(
@@ -510,6 +580,11 @@ export async function verifyRegistrationOtp(
     countryCode: countryValue,
     fullName,
     dateOfBirth,
+    gender: pending.gender,
+    maritalStatus: pending.maritalStatus,
+    addressLine1: pending.addressLine1,
+    stateProvince: pending.stateProvince,
+    referralCode: pending.referralCode ?? null,
   });
 
   const verifiedRegistration: VerifiedRegistration = {
@@ -1291,58 +1366,86 @@ export async function requestPinResetOtp(
   formData: FormData,
 ): Promise<ActionResult> {
   const supabase = await createClient();
-
-  const phoneInput =
-    getString(formData, "phone");
+  const phoneInput = getString(formData, "phone");
 
   if (!phoneInput) {
-    return {
-      error:
-        "Please enter your mobile number.",
-    };
+    return { error: "Please enter your mobile number." };
   }
 
-  const phoneResult =
-    normalizePhone(phoneInput);
+  const isInternationalInput = phoneInput.trim().startsWith("+");
+  const phoneCandidates = isInternationalInput
+    ? [normalizePhone(phoneInput)].flatMap((candidate) =>
+        candidate ? [candidate] : [],
+      )
+    : COUNTRIES.flatMap((country) => {
+        const candidate = normalizePhone(phoneInput, country.code);
+        return candidate ? [candidate] : [];
+      });
 
-  if (!phoneResult) {
-    return {
-      error:
-        "Please enter a valid mobile number.",
-    };
+  const uniqueCandidates = Array.from(
+    new Map(
+      phoneCandidates.map((candidate) => [
+        `${candidate.phone}:${candidate.countryCode}`,
+        candidate,
+      ]),
+    ).values(),
+  );
+
+  if (uniqueCandidates.length === 0) {
+    return { error: "Please enter a valid mobile number." };
   }
 
-  const user =
-    await prisma.user.findUnique({
-      where: {
-        phone: phoneResult.phone,
+  const matchingUsers = await prisma.user.findMany({
+    where: {
+      phone: {
+        in: uniqueCandidates.map((candidate) => candidate.phone),
       },
-      select: {
-        authUserId: true,
-      },
-    });
+    },
+    select: {
+      phone: true,
+      countryCode: true,
+    },
+  });
 
-  if (!user) {
+  const user = matchingUsers.find((candidateUser) =>
+    Boolean(candidateUser.phone && candidateUser.countryCode) &&
+    uniqueCandidates.some(
+      (candidate) =>
+        candidate.phone === candidateUser.phone &&
+        candidate.countryCode === candidateUser.countryCode,
+    ),
+  );
+
+  // Keep the response generic for accounts that do not match.
+  if (!user || !user.phone || !user.countryCode) {
     return {
       success: true,
-      phone: phoneResult.phone,
+      phone: uniqueCandidates[0].phone,
+      countryCode: uniqueCandidates[0].countryCode,
     };
   }
 
-  const { error } =
-    await supabase.auth.signInWithOtp({
-      phone: phoneResult.phone,
-      options: {
-        shouldCreateUser: false,
-      },
-    });
+  const userCountry = COUNTRIES.find(
+    (country) => country.code === user.countryCode,
+  );
+
+  if (!userCountry) {
+    return {
+      success: true,
+      phone: uniqueCandidates[0].phone,
+      countryCode: uniqueCandidates[0].countryCode,
+    };
+  }
+
+  const { error } = await supabase.auth.signInWithOtp({
+    phone: user.phone,
+    options: {
+      shouldCreateUser: false,
+    },
+  });
 
   if (error) {
-    console.error(
-      "PIN reset OTP error:",
-      error,
-    );
-
+    console.error("PIN reset OTP error:", error);
     return {
       error:
         "We could not send the verification code. Please try again.",
@@ -1351,10 +1454,10 @@ export async function requestPinResetOtp(
 
   return {
     success: true,
-    phone: phoneResult.phone,
+    phone: user.phone,
+    countryCode: userCountry.code,
   };
 }
-
 export async function verifyPinResetOtp(
   formData: FormData,
 ): Promise<ActionResult> {

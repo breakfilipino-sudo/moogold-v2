@@ -10,10 +10,6 @@ export default async function ForgotPinPage() {
     data: { user: authUser },
   } = await supabase.auth.getUser();
 
-  /*
-   * If the user is already authenticated, use the
-   * authoritative registered phone from Prisma.
-   */
   if (authUser) {
     const user = await prisma.user.findUnique({
       where: {
@@ -21,22 +17,20 @@ export default async function ForgotPinPage() {
       },
       select: {
         phone: true,
+        countryCode: true,
       },
     });
 
-    if (user?.phone) {
+    if (user?.phone && user.countryCode) {
       return (
         <ForgotPinClient
           registeredPhone={user.phone}
+          registeredCountryCode={user.countryCode}
           authenticatedFlow
         />
       );
     }
   }
 
-  /*
-   * Logged-out users still need to identify the account
-   * they want to recover.
-   */
   return <ForgotPinClient />;
 }

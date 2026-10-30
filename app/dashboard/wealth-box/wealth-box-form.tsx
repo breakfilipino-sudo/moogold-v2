@@ -186,9 +186,6 @@ export default function WealthBoxForm({
           <span className="text-sm font-bold text-slate-900">
             Enter amount you want to invest
           </span>
-          <span className="text-xs font-semibold text-slate-500">
-            Minimum amount: {formatLocal(minimum, currency)}
-          </span>
         </div>
 
         <div className="mt-4 flex items-center gap-2 border-b border-slate-200 pb-3">

@@ -382,19 +382,14 @@ return ( <main className="moogold-landing min-h-screen overflow-x-hidden bg-[#f7
 
         <div className="hidden items-center gap-2 md:flex">
           <PublicLanguageSelector initialLanguage={initialLanguage} />
-          <InstallAppButton className="inline-flex items-center gap-2 rounded-xl border border-[#d8e2dc] bg-white px-4 py-2.5 text-[12px] font-bold text-[#17231e] transition hover:border-[#b9ccc2]" />
+          <InstallAppButton className="inline-flex items-center gap-2 rounded-xl border border-[#138a5d] bg-gradient-to-r from-[#138a5d] to-[#0f7651] px-4 py-2.5 text-[12px] font-bold text-white shadow-[0_6px_18px_rgba(19,138,93,.20)] transition duration-200 hover:-translate-y-0.5 hover:from-[#0f7b52] hover:to-[#0b6847] hover:shadow-[0_9px_22px_rgba(19,138,93,.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#138a5d] focus-visible:ring-offset-2" />
           <Link
             href="/login"
             className="rounded-xl px-4 py-2.5 text-[12px] font-bold text-[#52605a] transition hover:bg-white hover:text-[#17231e]"
           >
             {t("logIn")}
           </Link>
-          <Link
-            href="/register"
-            className="rounded-xl bg-[#138a5d] px-4 py-2.5 text-[12px] font-bold text-white shadow-sm transition hover:bg-[#0f7b52]"
-          >
-            {t("createAccount")}
-          </Link>
+          
         </div>
 
         <button
@@ -446,13 +441,7 @@ return ( <main className="moogold-landing min-h-screen overflow-x-hidden bg-[#f7
               >
                 {t("logIn")}
               </Link>
-              <Link
-                href="/register"
-                onClick={() => setMobileOpen(false)}
-                className="rounded-xl bg-[#138a5d] py-3 text-center text-sm font-bold text-white"
-              >
-                {t("createAccount")}
-              </Link>
+              
             </div>
           </nav>
         </div>
@@ -475,14 +464,8 @@ return ( <main className="moogold-landing min-h-screen overflow-x-hidden bg-[#f7
             {t("heroTagline")}
           </p>
           <div className="mt-7 flex flex-wrap gap-2.5">
-            <Link
-              href="/register"
-              className="group inline-flex h-11 items-center gap-2 rounded-xl bg-[#138a5d] px-5 text-[13px] font-bold text-white shadow-[0_8px_22px_rgba(19,138,93,.14)] transition hover:bg-[#0f7b52]"
-            >
-              {t("createAccount")}
-              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-            <InstallAppButton className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#d7e1db] bg-white px-5 text-[13px] font-bold text-[#25352e] transition hover:border-[#b9cbc1]" />
+            
+            <InstallAppButton className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#138a5d] bg-gradient-to-r from-[#138a5d] to-[#0f7651] px-5 text-[13px] font-bold text-white shadow-[0_8px_22px_rgba(19,138,93,.20)] transition duration-200 hover:-translate-y-0.5 hover:from-[#0f7b52] hover:to-[#0b6847] hover:shadow-[0_11px_26px_rgba(19,138,93,.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#138a5d] focus-visible:ring-offset-2" />
           </div>
           <div className="mt-7 flex flex-wrap gap-x-6 gap-y-2 text-[12px] font-semibold text-[#7d8983]">
             <span className="flex items-center gap-1.5">

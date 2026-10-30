@@ -11,48 +11,30 @@ import {
 } from "lucide-react";
 
 import { requestPinResetOtp } from "@/app/auth/actions";
+import { getCountry } from "@/lib/phone";
 
 type ForgotPinClientProps = {
   registeredPhone?: string;
+  registeredCountryCode?: string;
   authenticatedFlow?: boolean;
 };
 
-function formatPhone(phone: string) {
-  if (!phone) {
-    return "";
+function formatPhone(
+  phone: string,
+  countryCode: string,
+) {
+  const country = getCountry(countryCode);
+
+  if (!phone || !country) {
+    return phone;
   }
 
-  if (phone.startsWith("+60")) {
-    return phone.replace(
-      /^(\+60)(\d{2})(\d+)?$/,
-      "$1 $2 $3",
-    );
-  }
-
-  if (phone.startsWith("+63")) {
-    return phone.replace(
-      /^(\+63)(\d{3})(\d+)?$/,
-      "$1 $2 $3",
-    );
-  }
-
-  if (phone.startsWith("+65")) {
-    return phone.replace(
-      /^(\+65)(\d{4})(\d{4})$/,
-      "$1 $2 $3",
-    );
-  }
-
-  if (phone.startsWith("+66")) {
-    return phone.replace(
-      /^(\+66)(\d{2})(\d+)?$/,
-      "$1 $2 $3",
-    );
+  if (phone.startsWith(country.dialCode)) {
+    return `${country.dialCode} ${phone.slice(country.dialCode.length)}`;
   }
 
   return phone;
 }
-
 function maskPhone(phone: string) {
   if (phone.length <= 6) {
     return phone;
@@ -63,6 +45,7 @@ function maskPhone(phone: string) {
 
 export default function ForgotPinClient({
   registeredPhone,
+  registeredCountryCode,
   authenticatedFlow = false,
 }: ForgotPinClientProps) {
   const router = useRouter();
@@ -70,6 +53,7 @@ export default function ForgotPinClient({
   const [phone, setPhone] = useState(
     registeredPhone ?? "",
   );
+  const countryCode = registeredCountryCode ?? "NG";
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -103,9 +87,7 @@ export default function ForgotPinClient({
 
       if (result?.success && result.phone) {
         router.push(
-          `/forgot-pin/verify?phone=${encodeURIComponent(
-            result.phone,
-          )}`,
+          `/forgot-pin/verify?phone=${encodeURIComponent(result.phone)}&countryCode=${encodeURIComponent(result.countryCode ?? countryCode)}`,
         );
       }
     } catch (submitError) {
@@ -186,7 +168,7 @@ export default function ForgotPinClient({
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-slate-900 dark:text-white">
                       {maskPhone(
-                        formatPhone(phone),
+                        formatPhone(phone, countryCode),
                       )}
                     </p>
 
@@ -194,8 +176,7 @@ export default function ForgotPinClient({
                       Registered on your MooGold account
                     </p>
                   </div>
-                </div>
-              ) : (
+                </div>              ) : (
                 <>
                   <input
                     id="phone"
@@ -203,21 +184,14 @@ export default function ForgotPinClient({
                     type="tel"
                     value={phone}
                     onChange={(event) =>
-                      setPhone(
-                        event.target.value,
-                      )
+                      setPhone(event.target.value)
                     }
                     required
-                    autoComplete="tel"
+                    autoComplete="tel-national"
                     inputMode="tel"
-                    placeholder="+60 12 345 6789"
+                    placeholder="Enter your mobile number"
                     className="h-12 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-emerald-500 dark:focus:ring-emerald-500/10"
                   />
-
-                  <p className="mt-1.5 text-[10px] text-slate-400 dark:text-slate-500">
-                    Enter the mobile number registered to
-                    your account.
-                  </p>
                 </>
               )}
             </div>

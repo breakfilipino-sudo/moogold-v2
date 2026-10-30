@@ -528,6 +528,8 @@ model UserVerification {
   status             VerificationStatus     @default(NOT_STARTED)
   dateOfBirth        DateTime?
   countryCode        String?
+  gender             String?
+  maritalStatus      String?
   addressLine1       String?
   addressLine2       String?
   city               String?

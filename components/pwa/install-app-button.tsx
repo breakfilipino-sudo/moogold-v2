@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Download, Share, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -11,8 +11,6 @@ interface BeforeInstallPromptEvent extends Event {
   }>;
 }
 
-type GuideType = "ios" | "in-app" | "browser" | "installed";
-
 export default function InstallAppButton({
   className = "",
   children = "Download App",
@@ -22,8 +20,9 @@ export default function InstallAppButton({
 }) {
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
-  const [showGuide, setShowGuide] = useState(false);
-  const [guideType, setGuideType] = useState<GuideType>("ios");
+  const [installing, setInstalling] = useState(false);
+  const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const [isIOSInAppBrowser, setIsIOSInAppBrowser] = useState(false);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (event: Event) => {
@@ -31,60 +30,59 @@ export default function InstallAppButton({
       setInstallPrompt(event as BeforeInstallPromptEvent);
     };
 
+    const handleAppInstalled = () => {
+      setInstallPrompt(null);
+    };
+
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
 
     return () => {
       window.removeEventListener(
         "beforeinstallprompt",
         handleBeforeInstallPrompt,
       );
+      window.removeEventListener("appinstalled", handleAppInstalled);
     };
   }, []);
 
   async function handleInstall() {
+    if (installing) return;
+
     const ua = navigator.userAgent;
 
     const isIOS =
       /iPhone|iPad|iPod/i.test(ua) ||
       (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
 
-    const isInAppBrowser =
-      /FBAN|FBAV|Instagram|Line\/|MicroMessenger|WhatsApp/i.test(ua);
-
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (navigator as Navigator & { standalone?: boolean }).standalone === true;
 
-    if (isStandalone) {
-      setGuideType("installed");
-      setShowGuide(true);
-      return;
-    }
+    if (isStandalone) return;
 
     if (isIOS) {
-      setGuideType(isInAppBrowser ? "in-app" : "ios");
-      setShowGuide(true);
+      setIsIOSInAppBrowser(
+        /FBAN|FBAV|Instagram|Line\/|MicroMessenger|WhatsApp/i.test(ua),
+      );
+      setShowIOSGuide(true);
       return;
     }
 
-    if (installPrompt) {
-      const prompt = installPrompt;
-      setInstallPrompt(null);
+    if (!installPrompt) return;
 
-      try {
-        await prompt.prompt();
-        const choice = await prompt.userChoice;
+    const prompt = installPrompt;
+    setInstallPrompt(null);
+    setInstalling(true);
 
-        if (choice.outcome === "accepted") {
-          return;
-        }
-      } catch {
-        // Show browser installation guidance if the prompt fails.
-      }
+    try {
+      await prompt.prompt();
+      await prompt.userChoice;
+    } catch {
+      // No custom installation guidance on Android or desktop.
+    } finally {
+      setInstalling(false);
     }
-
-    setGuideType("browser");
-    setShowGuide(true);
   }
 
   return (
@@ -92,28 +90,30 @@ export default function InstallAppButton({
       <button
         type="button"
         onClick={handleInstall}
+        disabled={installing}
+        aria-label="Download and install MooGold"
         className={className}
       >
         <Download className="h-3.5 w-3.5" />
         {children}
       </button>
 
-      {showGuide && (
+      {showIOSGuide && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-          onClick={() => setShowGuide(false)}
+          onClick={() => setShowIOSGuide(false)}
         >
           <section
             role="dialog"
             aria-modal="true"
-            aria-labelledby="install-app-title"
+            aria-labelledby="ios-install-title"
             className="relative w-full max-w-sm rounded-3xl bg-white p-6 text-[#10201b] shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <button
               type="button"
-              onClick={() => setShowGuide(false)}
-              aria-label="Close installation guide"
+              onClick={() => setShowIOSGuide(false)}
+              aria-label="Close"
               className="absolute right-4 top-4 rounded-full p-2 text-slate-500 transition hover:bg-slate-100"
             >
               <X className="h-5 w-5" />
@@ -124,95 +124,69 @@ export default function InstallAppButton({
             </div>
 
             <h2
-              id="install-app-title"
+              id="ios-install-title"
               className="pr-8 text-xl font-black tracking-tight"
             >
-              {guideType === "installed"
-                ? "MooGold is installed"
-                : guideType === "in-app"
-                  ? "Open MooGold in Safari"
-                  : guideType === "ios"
-                    ? "Install MooGold on iPhone"
-                    : "Install MooGold"}
+              Install MooGold app
             </h2>
 
-            {guideType === "installed" ? (
+            {isIOSInAppBrowser ? (
               <p className="mt-3 text-sm leading-6 text-slate-600">
-                MooGold is already running as an installed app on this
-                device. Look for the MooGold icon on your Home Screen.
+                First, open this page in Safari. Then follow the three
+                simple steps below to add MooGold to your Home Screen.
               </p>
-            ) : guideType === "in-app" ? (
-              <div className="mt-3 space-y-3 text-sm leading-6 text-slate-600">
-                <p>
-                  To add MooGold to your Home Screen, open this website
-                  in Safari.
-                </p>
-                <p>
-                  In Safari, tap the Share button, select{" "}
-                  <strong>Add to Home Screen</strong>, then tap{" "}
-                  <strong>Add to install MooGold</strong>.
-                </p>
-              </div>
-            ) : guideType === "ios" ? (
-              <div className="mt-4 space-y-4">
-                <p className="text-sm leading-6 text-slate-600">
-                  Add MooGold to your iPhone Home Screen in three simple
-                  steps.
-                </p>
-
-                <div className="flex items-start gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-sm font-black text-emerald-700">
-                    1
-                  </span>
-                  <p className="pt-1 text-sm leading-6 text-slate-700">
-                    Open MooGold in <strong>Safari</strong>.
-                  </p>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                    <Share className="h-4 w-4" />
-                  </span>
-                  <p className="pt-1 text-sm leading-6 text-slate-700">
-                    Tap Safari&apos;s <strong>Share</strong> button.
-                  </p>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-sm font-black text-emerald-700">
-                    3
-                  </span>
-                  <p className="pt-1 text-sm leading-6 text-slate-700">
-                    Select <strong>Add to Home Screen</strong>, then tap{" "}
-                    <strong>Add to install MooGold</strong>.
-                  </p>
-                </div>
-              </div>
             ) : (
-              <div className="mt-3 space-y-3 text-sm leading-6 text-slate-600">
-                <p>
-                  Automatic installation is not available in this browser
-                  session.
-                </p>
-                <p>
-                  Open the browser menu and look for{" "}
-                  <strong>Install app</strong> or{" "}
-                  <strong>Add to Home Screen</strong>, if available.
-                </p>
-              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Install the MooGold app on your iPhone by following
+                these simple steps.
+              </p>
             )}
+
+            <div className="mt-5 space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                  <Share className="h-5 w-5" />
+                </span>
+                <div className="text-sm leading-5 text-slate-700">
+                  <strong>1. Tap Share</strong>
+                  <p className="mt-1 text-slate-500">
+                    At the bottom of Safari.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                  <Download className="h-5 w-5" />
+                </span>
+                <div className="text-sm leading-5 text-slate-700">
+                  <strong>2. Tap Add to Home Screen</strong>
+                  <p className="mt-1 text-slate-500">
+                    Find it in the Share menu.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                  <Download className="h-5 w-5" />
+                </span>
+                <div className="text-sm leading-5 text-slate-700">
+                  <strong>3. Tap Add</strong>
+                  <p className="mt-1 text-slate-500">
+                    MooGold will appear on your Home Screen.
+                  </p>
+                </div>
+              </div>
+            </div>
 
             <button
               type="button"
-              onClick={() => setShowGuide(false)}
+              onClick={() => setShowIOSGuide(false)}
               className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-[#10201b] px-5 text-sm font-bold text-white transition hover:bg-[#18352d]"
             >
-              Install Guide
+              Got it
             </button>
-
-            <p className="mt-3 text-center text-xs text-slate-500">
-              MooGold - More than a wallet.
-            </p>
           </section>
         </div>
       )}
