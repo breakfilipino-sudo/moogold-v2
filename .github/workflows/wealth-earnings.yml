@@ -1,0 +1,104 @@
+name: MooGold Daily Wealth Earnings
+
+on:
+  schedule:
+    - cron: "5 0 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: moogold-daily-wealth-earnings
+  cancel-in-progress: false
+
+jobs:
+  process-earnings:
+    name: Process daily Wealth earnings
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      NODE_ENV: production
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      MOOGOLD_AUTH_SECRET: ${{ secrets.MOOGOLD_AUTH_SECRET }}
+      NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+
+    steps:
+      - name: Check out MooGold
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Check required secrets
+        shell: bash
+        run: |
+          required=(
+            DATABASE_URL
+            DIRECT_URL
+            CRON_SECRET
+            MOOGOLD_AUTH_SECRET
+            NEXT_PUBLIC_SUPABASE_URL
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+            SUPABASE_SECRET_KEY
+          )
+
+          for name in "${required[@]}"; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing GitHub Actions secret: $name"
+              exit 1
+            fi
+          done
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build MooGold
+        run: npm run build
+
+      - name: Start local MooGold server
+        shell: bash
+        run: |
+          nohup npm run start -- --hostname 127.0.0.1 --port 3000 \
+            > /tmp/moogold-next.log 2>&1 < /dev/null &
+          echo $! > /tmp/moogold-next.pid
+
+      - name: Wait for local server
+        shell: bash
+        run: |
+          ready=false
+
+          for attempt in $(seq 1 60); do
+            status=$(curl --silent --output /dev/null \
+              --write-out "%{http_code}" \
+              --connect-timeout 2 \
+              http://127.0.0.1:3000/api/cron/wealth-earnings || true)
+
+            if [ "$status" = "401" ]; then
+              ready=true
+              break
+            fi
+
+            sleep 2
+          done
+
+          if [ "$ready" != "true" ]; then
+            echo "::error::MooGold server did not become ready."
+            tail -100 /tmp/moogold-next.log || true
+            exit 1
+          fi
+
+      - name: Process daily Wealth earnings
+        shell: bash
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --max-time 1200 \
+            --request GET \
+            --header "Authorization: Bearer ${CRON_SECRET}" \
+            http://127.0.0.1:3000/api/cron/wealth-earnings
