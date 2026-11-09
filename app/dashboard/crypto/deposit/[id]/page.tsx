@@ -43,16 +43,28 @@ const CRYPTO_OPTIONS = [
     icon: Gem,
   },
   {
-    asset: "TRN",
-    network: "TRON",
-    networkLabel: "Tron",
-    icon: Coins,
-  },
-  {
     asset: "XLM",
     network: "STELLAR",
     networkLabel: "Stellar",
     icon: Coins,
+  },
+  {
+    asset: "BNB",
+    network: "BNB_SMART_CHAIN",
+    networkLabel: "BNB Smart Chain (BEP-20)",
+    icon: Coins,
+  },
+  {
+    asset: "TRX",
+    network: "TRON",
+    networkLabel: "Tron (TRC-20)",
+    icon: Coins,
+  },
+  {
+    asset: "SUI",
+    network: "SUI",
+    networkLabel: "Sui",
+    icon: Gem,
   },
 ] as const;
 
@@ -111,6 +123,22 @@ export default async function CryptoDashboardPage() {
     ]),
   );
 
+  const legacyTrnBalance = balanceMap.get("TRN:TRON") ?? "0";
+
+  const displayCryptoOptions = [
+    ...CRYPTO_OPTIONS,
+    ...(Number(legacyTrnBalance) > 0
+      ? [
+          {
+            asset: "TRN",
+            network: "TRON",
+            networkLabel: "Tron (legacy)",
+            icon: Coins,
+          },
+        ]
+      : []),
+  ];
+
   /*
    * Stablecoins are valued at $1 for the dashboard total.
    * This ensures an approved USDT/USDC balance immediately
@@ -167,7 +195,7 @@ export default async function CryptoDashboardPage() {
         </div>
 
         <div className="divide-y divide-slate-100">
-          {CRYPTO_OPTIONS.map((crypto) => {
+          {displayCryptoOptions.map((crypto) => {
             const Icon = crypto.icon;
 
             const balance =

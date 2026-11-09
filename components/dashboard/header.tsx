@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   FormEvent,
@@ -88,6 +89,24 @@ const searchablePages = [
   },
 ];
 
+async function updateAppBadge(count: number) {
+  if (typeof navigator === "undefined") return;
+
+  const badgeNavigator = navigator as Navigator & {
+    setAppBadge?: (contents?: number) => Promise<void>;
+    clearAppBadge?: () => Promise<void>;
+  };
+
+  try {
+    if (count > 0 && badgeNavigator.setAppBadge) {
+      await badgeNavigator.setAppBadge(count);
+    } else if (count === 0 && badgeNavigator.clearAppBadge) {
+      await badgeNavigator.clearAppBadge();
+    }
+  } catch {
+    // App icon badges are optional and browser-dependent.
+  }
+}
 function formatNotificationDate(date: string) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -114,6 +133,7 @@ export default function Header({ userName }: HeaderProps) {
   const [notificationsLoading, setNotificationsLoading] =
     useState(false);
   const [markingAll, setMarkingAll] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<HeaderNotification | null>(null);
 
   const notificationRef =
     useRef<HTMLDivElement>(null);
@@ -138,6 +158,7 @@ export default function Header({ userName }: HeaderProps) {
     try {
       const count = await getUnreadNotificationCountAction();
       setNotificationCount(count);
+      void updateAppBadge(count);
     } catch {
       // Keep the header usable if notification loading fails.
     }
@@ -150,6 +171,7 @@ async function loadNotifications() {
 
       setNotifications(result.notifications);
       setNotificationCount(result.unreadCount);
+      void updateAppBadge(result.unreadCount);
     } catch {
       // Keep the header usable if notification loading fails.
     } finally {
@@ -220,9 +242,11 @@ async function loadNotifications() {
           ),
         );
 
-        setNotificationCount((current) =>
-          Math.max(0, current - 1),
-        );
+        setNotificationCount((current) => {
+          const nextCount = Math.max(0, current - 1);
+          void updateAppBadge(nextCount);
+          return nextCount;
+        });
       } catch {
         // Navigation should still work even if marking read fails.
       }
@@ -230,9 +254,7 @@ async function loadNotifications() {
 
     setNotificationsOpen(false);
 
-    if (notification.href) {
-      router.push(notification.href);
-    }
+    setSelectedNotification(notification);
   }
 
   async function handleMarkAllAsRead() {
@@ -255,6 +277,7 @@ async function loadNotifications() {
       );
 
       setNotificationCount(0);
+      void updateAppBadge(0);
     } catch {
       // Keep the current notification state if the action fails.
     } finally {
@@ -578,6 +601,48 @@ async function loadNotifications() {
           )}
         </div>
       </div>
+      {selectedNotification && typeof document !== "undefined" ? createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close notification"
+            onClick={() => setSelectedNotification(null)}
+            className="absolute inset-0 bg-black/55"
+          />
+
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="header-notification-title"
+            className="relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-7"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <h2
+                id="header-notification-title"
+                className="text-lg font-black leading-7 text-[#10201b] sm:text-xl"
+              >
+                {selectedNotification.title}
+              </h2>
+
+              <button
+                type="button"
+                aria-label="Close notification"
+                onClick={() => setSelectedNotification(null)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="mt-5 whitespace-pre-wrap break-words text-base leading-7 text-slate-700 sm:text-lg sm:leading-8">
+              {selectedNotification.message}
+            </p>
+
+            <p className="mt-5 text-xs font-medium text-slate-400">
+              {formatNotificationDate(selectedNotification.createdAt)}
+            </p>
+          </section>
+        </div>, document.body) : null}
     </header>
   );
 }

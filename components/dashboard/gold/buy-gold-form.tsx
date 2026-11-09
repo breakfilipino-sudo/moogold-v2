@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import {
   ArrowDownToLine,
@@ -8,6 +9,7 @@ import {
   Loader2,
   LockKeyhole,
   ShieldCheck,
+  WalletCards,
   X,
 } from "lucide-react";
 
@@ -15,6 +17,8 @@ import { buyGold } from "@/app/dashboard/gold/actions";
 
 type BuyGoldFormProps = {
   walletBalance: number;
+  localCurrency: string;
+  localWalletBalance: number | null;
   goldPrice: number;
   goldAskPrice: number | null;
 };
@@ -37,10 +41,20 @@ const money = (value: number) =>
     minimumFractionDigits: 2,
   }).format(value);
 
+const localMoney = (value: number, currency: string) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+
 const goldAmount = (value: number) => `${value.toFixed(8)} oz`;
 
 export default function BuyGoldForm({
   walletBalance,
+  localCurrency,
+  localWalletBalance,
   goldPrice,
   goldAskPrice,
 }: BuyGoldFormProps) {
@@ -51,7 +65,7 @@ export default function BuyGoldForm({
   const [isPending, startTransition] = useTransition();
 
   const numericAmount = useMemo(() => {
-    const parsed = Number(amount);
+    const parsed = Number(amount.replace(/,/g, ""));
 
     return Number.isFinite(parsed) ? parsed : 0;
   }, [amount]);
@@ -83,17 +97,26 @@ export default function BuyGoldForm({
     executionPrice > 0;
 
   function handleAmountChange(value: string) {
-    if (value === "") {
+    const unformatted = value.replace(/,/g, "");
+
+    if (unformatted === "") {
       setAmount("");
       setResult(null);
       return;
     }
 
-    if (!/^\d*\.?\d{0,2}$/.test(value)) {
+    if (!/^\d*\.?\d{0,2}$/.test(unformatted)) {
       return;
     }
 
-    setAmount(value);
+    const [integerPart, fractionPart] = unformatted.split(".");
+    const groupedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+    setAmount(
+      fractionPart !== undefined
+        ? `${groupedInteger}.${fractionPart}`
+        : groupedInteger,
+    );
     setResult(null);
   }
 
@@ -129,14 +152,14 @@ export default function BuyGoldForm({
 
   return (
     <>
-      <div className="rounded-[28px] border border-black/5 bg-white p-5 shadow-sm sm:p-7">
+      <div className="overflow-hidden rounded-[28px] border border-emerald-950/10 bg-white p-5 shadow-[0_18px_55px_rgba(16,32,27,0.08)] sm:p-7">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-black/30">
               Order details
             </p>
 
-            <h2 className="mt-1 text-2xl font-black tracking-tight text-[#10201b]">
+            <h2 className="mt-1 text-lg font-black tracking-tight text-[#10201b]">
               Purchase gold
             </h2>
 
@@ -185,9 +208,11 @@ export default function BuyGoldForm({
             <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4">
               <p className="text-xs font-bold leading-5 text-red-800">
                 {exceedsBalance
-                  ? `You only have ${money(
-                      walletBalance,
-                    )} available in your wallet.`
+                  ? `You only have ${money(walletBalance)}${
+                      localCurrency !== "USD" && localWalletBalance !== null
+                        ? ` (${localMoney(localWalletBalance, localCurrency)})`
+                        : ""
+                    } available in your wallet.`
                   : belowMinimum
                     ? `The minimum gold purchase is ${money(
                         MIN_TRADE_USD,
@@ -198,51 +223,6 @@ export default function BuyGoldForm({
               </p>
             </div>
           )}
-
-        <div className="mt-7 rounded-3xl bg-[#f7faf8] p-5">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-black/25">
-            Estimated order
-          </p>
-
-          <div className="mt-4 space-y-3">
-            <CalculationRow
-              label="Purchase amount"
-              value={money(numericAmount > 0 ? numericAmount : 0)}
-            />
-
-            <CalculationRow
-              label="Gold price"
-              value={
-                executionPrice > 0
-                  ? `${money(executionPrice)} / oz`
-                  : "Unavailable"
-              }
-            />
-
-            <CalculationRow
-              label="Estimated gold"
-              value={goldAmount(estimatedQuantity)}
-            />
-
-            <div className="my-2 h-px bg-black/5" />
-
-            <CalculationRow
-              label="Estimated total"
-              value={money(numericAmount > 0 ? numericAmount : 0)}
-              strong
-            />
-          </div>
-        </div>
-
-        <div className="mt-6 flex items-start gap-3 rounded-2xl border border-amber-200/70 bg-amber-50 p-4">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-
-          <p className="text-xs font-medium leading-5 text-amber-900/70">
-            The displayed quantity is an estimate. Your final gold
-            quantity is calculated using the execution price when the
-            transaction is confirmed.
-          </p>
-        </div>
 
         {result && (
           <div
@@ -295,24 +275,34 @@ export default function BuyGoldForm({
           </div>
         )}
 
-        <button
-          type="button"
-          disabled={!validAmount || isPending}
-          onClick={handleContinue}
-          className="mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#0a1713] text-sm font-black text-white transition hover:bg-[#10251e] disabled:cursor-not-allowed disabled:bg-[#0a1713]/30"
-        >
-          {isPending ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Processing purchase...
-            </>
-          ) : (
-            <>
-              <LockKeyhole className="h-4 w-4" />
-              Continue to review
-            </>
-          )}
-        </button>
+        {exceedsBalance && !belowMinimum && !exceedsMaximum && executionPrice > 0 ? (
+          <Link
+            href="/dashboard/deposit-method"
+            className="mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 text-sm font-black text-[#06100d] shadow-lg shadow-emerald-500/15 transition hover:bg-emerald-400"
+          >
+            <WalletCards className="h-4 w-4" />
+            Add funds
+          </Link>
+        ) : (
+          <button
+            type="button"
+            disabled={!validAmount || isPending}
+            onClick={handleContinue}
+            className="mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#0a1713] text-sm font-black text-white transition hover:bg-[#10251e] disabled:cursor-not-allowed disabled:bg-[#0a1713]/30"
+          >
+            {isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Processing purchase...
+              </>
+            ) : (
+              <>
+                <LockKeyhole className="h-4 w-4" />
+                Continue to review
+              </>
+            )}
+          </button>
+        )}
 
         <p className="mt-3 text-center text-[10px] font-semibold text-black/25">
           You will review the transaction before any funds are moved.

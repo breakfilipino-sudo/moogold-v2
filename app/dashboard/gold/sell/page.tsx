@@ -65,20 +65,20 @@ export default async function SellGoldPage() {
   const changePercent = Number(gold?.changePercent ?? 0);
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-6 pb-8">
       {/* Header */}
-      <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 rounded-[24px] border border-slate-200/80 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard/gold"
             aria-label="Back to Gold"
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
 
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
               Sell Gold
             </h1>
             <p className="text-xs text-slate-500">
@@ -87,7 +87,7 @@ export default async function SellGoldPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4 rounded-lg border border-slate-200 bg-white px-3 py-2">
+        <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-[#f5f8f6] px-4 py-3">
           <div>
             <p className="text-[10px] text-slate-400">Gold price</p>
             <p className="text-xs font-semibold text-slate-900">
@@ -111,7 +111,7 @@ export default async function SellGoldPage() {
         </div>
       </div>
 
-      <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+      <section className="grid items-start gap-5 lg:grid-cols-[1.1fr_0.9fr]">
         <SellGoldForm
           goldQuantity={goldQuantity}
           goldPrice={goldPrice}
@@ -119,7 +119,7 @@ export default async function SellGoldPage() {
         />
 
         <div className="space-y-4">
-          <div className="rounded-xl border border-slate-200 bg-white">
+          <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
             <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
               <div className="flex items-center gap-2">
                 <Coins className="h-4 w-4 text-amber-500" />
@@ -146,7 +146,7 @@ export default async function SellGoldPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-4 sm:px-5">
             <div className="flex items-start gap-2.5">
               <WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
               <p className="text-[11px] leading-5 text-slate-500">

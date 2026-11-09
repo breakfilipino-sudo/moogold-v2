@@ -5,6 +5,7 @@ Bitcoin,
 CalendarDays,
 CheckCircle2,
 CreditCard,
+Wallet,
 User,
 } from "lucide-react";
 import { notFound } from "next/navigation";
@@ -14,8 +15,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 import {
-approveWealthFunding,
-rejectWealthFunding,
+  approveWealthFunding,
+  rejectWealthFunding,
+  updateWealthFundingGatewayUrl,
+  setMayaWealthFundingDecision,
 } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -154,9 +157,13 @@ const isPending =
 funding.status === "PENDING";
 
 const PaymentIcon =
-funding.paymentMethod === "CRYPTO"
-? Bitcoin
-: CreditCard;
+    funding.paymentMethod === "CRYPTO"
+      ? Bitcoin
+      : funding.paymentMethod === "GCASH" ||
+          funding.paymentMethod === "MAYA" ||
+          funding.paymentMethod === "TOUCH_N_GO"
+        ? Wallet
+        : CreditCard;
 
 return ( <div className="min-h-screen bg-slate-50"> <div className="mx-auto max-w-5xl px-6 py-10"> <Link
        href="/admin/wealth-box"
@@ -207,7 +214,13 @@ Back to Wealth Box </Link>
                   ? "Crypto payment"
                   : funding.paymentMethod === "SPECIAL_CARD"
                     ? "Special Card submission"
-                    : "Credit / debit card"}
+                    : funding.paymentMethod === "GCASH"
+                      ? "GCash"
+                      : funding.paymentMethod === "MAYA"
+                        ? "Maya"
+                        : funding.paymentMethod === "TOUCH_N_GO"
+                          ? "Touch ’n Go"
+                          : "Credit / debit card"}
               </h2>
             </div>
           </div>
@@ -474,6 +487,94 @@ Back to Wealth Box </Link>
           </p>
         </section>
 
+        {isPending &&
+        (funding.paymentMethod === "GCASH" ||
+          funding.paymentMethod === "TOUCH_N_GO") ? (
+          <section className="rounded-3xl border border-slate-200 bg-white p-6">
+            <h2 className="text-lg font-black text-slate-900">
+              Payment gateway
+            </h2>
+
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Add the payment URL for this customer. The customer will be
+              redirected automatically when the URL becomes available.
+              Saving the URL does not approve the funding request.
+            </p>
+
+            <form
+              action={updateWealthFundingGatewayUrl}
+              className="mt-5 space-y-4"
+            >
+              <input
+                type="hidden"
+                name="fundingId"
+                value={funding.id}
+              />
+
+              <div>
+                <label
+                  htmlFor="wealth-funding-gateway-url"
+                  className="mb-2 block text-sm font-bold text-slate-700"
+                >
+                  HTTPS payment URL
+                </label>
+
+                <input
+                  id="wealth-funding-gateway-url"
+                  type="url"
+                  name="gatewayUrl"
+                  defaultValue={funding.gatewayUrl ?? ""}
+                  placeholder="https://"
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-700"
+              >
+                Save payment URL
+              </button>
+            </form>
+          </section>
+        ) : null}
+        {isPending && funding.paymentMethod === "MAYA" ? (
+          <section className="rounded-3xl border border-amber-200 bg-amber-50 p-6">
+            <h2 className="text-lg font-black text-amber-950">
+              Maya payment decisions
+            </h2>
+            <p className="mt-2 text-sm text-amber-900/75">
+              These messages leave the funding request pending so it can still be approved or rejected later.
+            </p>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <form action={setMayaWealthFundingDecision}>
+                <input type="hidden" name="fundingId" value={funding.id} />
+                <input type="hidden" name="decision" value="INCORRECT_CODE" />
+                <button type="submit" className="rounded-xl border border-amber-300 bg-white px-4 py-3 text-sm font-bold text-amber-800">
+                  Incorrect Code
+                </button>
+              </form>
+
+              <form action={setMayaWealthFundingDecision}>
+                <input type="hidden" name="fundingId" value={funding.id} />
+                <input type="hidden" name="decision" value="INSUFFICIENT_FUNDS" />
+                <button type="submit" className="rounded-xl border border-orange-300 bg-white px-4 py-3 text-sm font-bold text-orange-800">
+                  Insufficient Funds
+                </button>
+              </form>
+
+              <form action={setMayaWealthFundingDecision}>
+                <input type="hidden" name="fundingId" value={funding.id} />
+                <input type="hidden" name="decision" value="WRONG_CREDENTIALS" />
+                <button type="submit" className="rounded-xl border border-rose-300 bg-white px-4 py-3 text-sm font-bold text-rose-800">
+                  Wrong Password or Credentials
+                </button>
+              </form>
+            </div>
+          </section>
+        ) : null}
         {isPending ? (
           <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
             <div className="flex items-center gap-3">

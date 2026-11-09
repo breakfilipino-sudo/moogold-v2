@@ -1,0 +1,9 @@
+ALTER TYPE "CryptoAsset" ADD VALUE 'BNB';
+ALTER TYPE "CryptoAsset" ADD VALUE 'TRX';
+ALTER TYPE "CryptoAsset" ADD VALUE 'SUI';
+
+ALTER TYPE "CryptoNetwork" ADD VALUE 'BNB_SMART_CHAIN';
+ALTER TYPE "CryptoNetwork" ADD VALUE 'SUI';
+
+ALTER TABLE "CryptoDeposit"
+ADD COLUMN "memo" TEXT;

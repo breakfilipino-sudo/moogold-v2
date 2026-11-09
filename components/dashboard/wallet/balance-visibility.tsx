@@ -5,20 +5,14 @@ import { Eye, EyeOff } from "lucide-react";
 
 type Props = {
   balance: string;
-  usdBalance: string;
-  currency: string;
-  availableFundsLabel: string;
 };
 
 export default function BalanceVisibility({
   balance,
-  usdBalance,
-  currency,
-  availableFundsLabel,
 }: Props) {
   const [visible, setVisible] = useState(true);
 
-  const hiddenValue = "••••••";
+  const hiddenValue = "\u2022\u2022\u2022\u2022\u2022\u2022";
 
   return (
     <div>
@@ -45,16 +39,6 @@ export default function BalanceVisibility({
         </button>
       </div>
 
-      {currency !== "USD" && (
-        <>
-          <p className="mt-2 text-xs font-medium text-white/35">
-            {availableFundsLabel} USD
-          </p>
-          <p className="mt-1 text-sm font-semibold text-emerald-300/80">
-            {visible ? usdBalance : hiddenValue}
-          </p>
-        </>
-      )}
     </div>
   );
 }

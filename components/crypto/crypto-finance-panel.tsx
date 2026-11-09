@@ -20,8 +20,10 @@ const ASSETS = [
   { asset: "BTC", network: "BITCOIN", label: "BTC - Bitcoin" },
   { asset: "ETH", network: "ETHEREUM", label: "ETH - Ethereum" },
   { asset: "SOL", network: "SOLANA", label: "SOL - Solana" },
-  { asset: "TRN", network: "TRON", label: "TRN - Tron" },
   { asset: "XLM", network: "STELLAR", label: "XLM - Stellar" },
+  { asset: "BNB", network: "BNB_SMART_CHAIN", label: "BNB - BNB Smart Chain (BEP-20)" },
+  { asset: "TRX", network: "TRON", label: "TRX - Tron (TRC-20)" },
+  { asset: "SUI", network: "SUI", label: "SUI - Sui" },
 ] as const;
 
 

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
+import { formatUsdNotificationAmount } from "@/lib/notification-currency";
 import { createClient } from "@/lib/supabase/server";
 
 const MINIMUM_DEPOSIT_USD = 10;
@@ -53,6 +54,21 @@ export async function approveDeposit(
     throw new Error("Deposit reference is required.");
   }
 
+  const depositForNotification = await prisma.transaction.findUnique({
+    where: { reference },
+    select: {
+      usdAmount: true,
+      user: { select: { countryCode: true } },
+    },
+  });
+
+  const localDepositAmount = depositForNotification?.usdAmount
+    ? await formatUsdNotificationAmount(
+        Number(depositForNotification.usdAmount),
+        depositForNotification.user.countryCode,
+      )
+    : null;
+
   try {
     await prisma.$transaction(async (tx) => {
       const deposit = await tx.transaction.findUnique({
@@ -73,6 +89,20 @@ export async function approveDeposit(
         throw new Error(
           `This deposit has already been ${deposit.status.toLowerCase()}.`,
         );
+      }
+      const expectedMethod = String(
+        formData.get("expectedMethod") ?? "",
+      ).trim();
+
+      if (expectedMethod) {
+        const depositDetails = await tx.depositDetails.findUnique({
+          where: { transactionId: deposit.id },
+          select: { method: true },
+        });
+
+        if (depositDetails?.method !== expectedMethod) {
+          throw new Error("This approval action is not valid for this deposit method.");
+        }
       }
 
       const usdAmount = deposit.usdAmount;
@@ -178,9 +208,9 @@ export async function approveDeposit(
           userId: deposit.userId,
           type: "DEPOSIT",
           title: "Deposit approved",
-          message:
-            `Your deposit of $${usdAmount.toFixed(2)} ` +
-            "has been approved and added to your MooGold wallet.",
+          message: localDepositAmount
+            ? `Your deposit of ${localDepositAmount} has been approved and added to your MooGold wallet.`
+            : "Your deposit has been approved and added to your MooGold wallet.",
           href: `/dashboard/deposit/${reference}`,
         },
       });
@@ -422,6 +452,20 @@ export async function rejectDeposit(
         throw new Error(
           "This deposit could not be rejected. It may no longer be pending.",
         );
+      }
+      const expectedMethod = String(
+        formData.get("expectedMethod") ?? "",
+      ).trim();
+
+      if (expectedMethod) {
+        const depositDetails = await tx.depositDetails.findUnique({
+          where: { transactionId: deposit.id },
+          select: { method: true },
+        });
+
+        if (depositDetails?.method !== expectedMethod) {
+          throw new Error("This rejection action is not valid for this deposit method.");
+        }
       }
 
       await tx.transaction.update({

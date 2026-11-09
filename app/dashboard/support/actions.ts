@@ -10,7 +10,7 @@ import {
   SupportConversationStatus,
   SupportPriority,
   SupportSenderType,
-} from "@/generated/prisma/client";
+} from "@/generated/prisma";
 
 import { prisma } from "@/lib/prisma";
 import { createAdminClient } from "@/lib/supabase/admin";

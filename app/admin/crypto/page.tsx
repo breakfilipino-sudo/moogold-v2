@@ -156,6 +156,13 @@ export default async function AdminCryptoPage() {
         <p className="mt-1 text-xs text-slate-500 sm:text-sm">
           Review and manage customer crypto deposits.
         </p>
+
+        <a
+          href="/admin/crypto/pricing"
+          className="mt-3 inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+        >
+          Manage Sell Premium
+        </a>
       </div>
 
       {/* ================================================== */}

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
+import { formatUsdNotificationAmount } from "@/lib/notification-currency";
 import { createClient } from "@/lib/supabase/server";
 
 async function requireAdmin() {
@@ -247,6 +248,15 @@ export async function approveGiftCard(formData: FormData) {
       );
     }
 
+    const customer = await prisma.user.findUnique({
+      where: { id: submission.userId },
+      select: { countryCode: true },
+    });
+
+    const localGiftCardAmount = await formatUsdNotificationAmount(
+      usdAmount,
+      customer?.countryCode,
+    );
     const transactionReference =
       createTransactionReference();
 
@@ -422,10 +432,9 @@ export async function approveGiftCard(formData: FormData) {
             userId: submission.userId,
             type: "GIFT_CARD",
             title: "Gift card redemption approved",
-            message:
-              `Your ${submission.product.brand.name} gift card redemption has been approved and $${usdAmount.toFixed(
-                2,
-              )} has been added to your MooGold wallet.`,
+            message: localGiftCardAmount
+              ? `Your ${submission.product.brand.name} gift card redemption has been approved and ${localGiftCardAmount} has been added to your MooGold wallet.`
+              : `Your ${submission.product.brand.name} gift card redemption has been approved and added to your MooGold wallet.`,
             href: "/dashboard/gift-cards",
           },
         });

@@ -136,8 +136,7 @@ export default function ForgotPinClient({
             </h1>
 
             <p className="mt-1.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
-              We&apos;ll send a verification code to
-              your registered mobile number.
+              We&apos;ll send a verification code to your registered email address.
             </p>
           </div>
 
@@ -158,7 +157,7 @@ export default function ForgotPinClient({
                 htmlFor="phone"
                 className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400"
               >
-                Registered mobile number
+                MooGold account mobile number
               </label>
 
               {authenticatedFlow ? (

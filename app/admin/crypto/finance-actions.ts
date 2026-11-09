@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 
@@ -231,7 +231,7 @@ export async function rejectCryptoCashConversion(
     if (!reason || reason.length > 500) {
       return {
         success: false,
-        error: "Enter a rejection reason of 1–500 characters.",
+        error: "Enter a rejection reason of 1â€“500 characters.",
       };
     }
 

@@ -183,17 +183,6 @@ Back </Link>
 
 }
 
-const localToUsdPreviewRate =
-minimumLocalAmount > 0
-? Number(plan.minimumUsd) /
-minimumLocalAmount
-: 0;
-
-const estimatedUsd =
-localToUsdPreviewRate > 0
-? amountValue * localToUsdPreviewRate
-: 0;
-
 const commonParams = new URLSearchParams({
 planId: plan.id,
 amount: amountValue.toString(),
@@ -212,7 +201,6 @@ Back </Link>
         amount={amountValue.toString()}
         currency={currency}
         localAmount={amountValue}
-        usdAmount={estimatedUsd}
       />
     </section>
   </div>

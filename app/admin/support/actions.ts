@@ -8,9 +8,11 @@ import {
   SupportConversationStatus,
   SupportPriority,
   SupportSenderType,
-} from "@/generated/prisma/client";
+  NotificationType,
+} from "@/generated/prisma";
 
 import { prisma } from "@/lib/prisma";
+import { createNotification } from "@/lib/notifications";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -464,6 +466,7 @@ export async function sendAdminSupportMessage(
       select: {
         id: true,
         status: true,
+        userId: true,
       },
     });
 
@@ -555,6 +558,20 @@ export async function sendAdminSupportMessage(
     };
   }
 
+  try {
+    await createNotification({
+      userId: conversation.userId,
+      type: NotificationType.SUPPORT,
+      title: "New support reply",
+      message: "Our support team has replied to your conversation.",
+      href: `/dashboard/support/${conversation.id}`,
+    });
+  } catch (notificationError) {
+    console.error(
+      "Support reply notification failed:",
+      notificationError,
+    );
+  }
   revalidatePath("/admin/support");
   revalidatePath(
     `/dashboard/support/${conversation.id}`,
@@ -709,6 +726,7 @@ export async function updateSupportConversation(
         : {}),
     },
   });
+
 
   revalidatePath("/admin/support");
   revalidatePath(

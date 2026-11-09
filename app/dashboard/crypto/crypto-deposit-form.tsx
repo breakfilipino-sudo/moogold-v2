@@ -11,47 +11,59 @@ import { submitCryptoDeposit } from "@/app/dashboard/crypto/actions";
 
 const CRYPTO_OPTIONS = [
   {
-    asset: "USDT",
-    network: "TRON",
-    networkLabel: "Tron (TRC-20)",
-    address: "TKrbT8qikYzZd8tBwPQ2teaLZCV4aJ5NKg",
-  },
-  {
-    asset: "USDC",
-    network: "ETHEREUM",
-    networkLabel: "Ethereum (ERC-20)",
-    address: "0x12C844aeA5FFe9271fb6f2F1e1fd1811512B4ad1",
-  },
-  {
     asset: "BTC",
     network: "BITCOIN",
     networkLabel: "Bitcoin",
-    address: "33a54tDd51n13TMYi6KqZ3WUdo2LpQcnqC",
+    address: "16GZmP9ybu1m1wYvzG5D4Q6aCrxn3ebYgU",
+  },
+  {
+    asset: "USDT",
+    network: "TRON",
+    networkLabel: "Tron (TRC-20)",
+    address: "TJKxnXkwhH8fC9qY9g8YXvCoHSqyZ1oR12",
+  },
+  {
+    asset: "BNB",
+    network: "BNB_SMART_CHAIN",
+    networkLabel: "BNB Smart Chain (BEP-20)",
+    address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
   },
   {
     asset: "ETH",
     network: "ETHEREUM",
     networkLabel: "Ethereum (ERC-20)",
-    address: "0xae70A129dfd37186C70697494B08c4151C408717",
+    address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+  },
+  {
+    asset: "USDC",
+    network: "ETHEREUM",
+    networkLabel: "Ethereum (ERC-20)",
+    address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
   },
   {
     asset: "SOL",
     network: "SOLANA",
     networkLabel: "Solana",
-    address: "GFenbSRhcZwPg7KE85AJS4AB7khUeVdBkUSQjuJj2xDj",
-  },
-  {
-    asset: "TRN",
-    network: "TRON",
-    networkLabel: "Tron",
-    address: "TLGGvkFbJWtT3jvxx8uss14Mshmrz7Kenx",
+    address: "orwuXMAC81ivmAKR5X4oB4hpvRzmfE7jSUXdrjQYgkv",
   },
   {
     asset: "XLM",
     network: "STELLAR",
     networkLabel: "Stellar",
-    address:
-      "GD5LP2XKZV2QJBY3VIJTTC6ECN3LGJQMCJXSAYPPXZHWGVTJOQM5H3MP",
+    address: "GABFQIK63R2NETJM7T673EAMZN4RJLLGP3OFUEJU5SZVTGWUKULZJNL6",
+    memo: "401607474",
+  },
+  {
+    asset: "TRX",
+    network: "TRON",
+    networkLabel: "Tron (TRC-20)",
+    address: "TJKxnXkwhH8fC9qY9g8YXvCoHSqyZ1oR12",
+  },
+  {
+    asset: "SUI",
+    network: "SUI",
+    networkLabel: "Sui",
+    address: "0xfe65cba4a2b4f67b13e68c548460d129fa0b0b9cae6f6e2d5d8ce0adaa94c8ab",
   },
 ] as const;
 
@@ -59,6 +71,7 @@ export default function CryptoDepositForm() {
   const [selectedAsset, setSelectedAsset] =
     useState("USDT");
   const [copied, setCopied] = useState(false);
+  const [memoCopied, setMemoCopied] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -71,6 +84,43 @@ export default function CryptoDepositForm() {
       ) ?? CRYPTO_OPTIONS[0],
     [selectedAsset],
   );
+
+  const selectedMemo = "memo" in selected ? selected.memo : null;
+
+  async function copyMemo() {
+    if (!selectedMemo) return;
+
+    try {
+      if (
+        typeof navigator !== "undefined" &&
+        navigator.clipboard &&
+        window.isSecureContext
+      ) {
+        await navigator.clipboard.writeText(selectedMemo);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = selectedMemo;
+        textArea.setAttribute("readonly", "");
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const copiedSuccessfully = document.execCommand("copy");
+        document.body.removeChild(textArea);
+
+        if (!copiedSuccessfully) {
+          throw new Error("Copy command failed");
+        }
+      }
+
+      setError("");
+      setMemoCopied(true);
+      window.setTimeout(() => setMemoCopied(false), 2000);
+    } catch {
+      setError("Unable to copy memo. Please copy it manually.");
+    }
+  }
 
   async function copyAddress() {
     const address = selected.address;
@@ -132,6 +182,7 @@ export default function CryptoDepositForm() {
       const formData = new FormData();
 
       formData.set("asset", selected.asset);
+      if (selectedMemo) formData.set("memo", selectedMemo);
 
       const result =
         await submitCryptoDeposit(formData);
@@ -165,9 +216,7 @@ export default function CryptoDepositForm() {
         </h3>
 
         <p className="mt-2 text-base leading-5 text-slate-600">
-          Your crypto deposit has been submitted.
-          Crypto arrives in your wallet within seconds,
-          depending on the network.
+          Your deposit report has been submitted. MooGold will review and verify the incoming transaction before crediting your crypto balance.
         </p>
 
         <div className="mt-5 space-y-3 rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm sm:p-5">
@@ -400,11 +449,44 @@ export default function CryptoDepositForm() {
         </div>
       </div>
 
+      {selectedMemo && (
+        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                Stellar memo (required)
+              </p>
+              <p className="mt-1 text-xs leading-5 text-amber-800">
+                Include this exact memo when sending XLM. Deposits without it may not be identifiable.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={copyMemo}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-amber-900 shadow-sm"
+            >
+              {memoCopied ? (
+                <>
+                  <Check className="h-3.5 w-3.5" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy
+                </>
+              )}
+            </button>
+          </div>
+          <code className="mt-3 block rounded-xl bg-white px-3 py-3 text-center font-mono text-lg font-bold tracking-wider text-slate-900">
+            {selectedMemo}
+          </code>
+        </div>
+      )}
       {/* Network speed */}
       <div className="mt-4 flex gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-white px-4 py-4 shadow-sm">
         <p className="text-base font-semibold leading-5 text-emerald-900">
-          Crypto arrives in your wallet within seconds,
-          depending on the network.
+          Send only using the selected network. Crypto arrives in seconds depending on network.
         </p>
       </div>
 

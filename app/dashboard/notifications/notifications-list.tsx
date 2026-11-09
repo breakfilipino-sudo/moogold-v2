@@ -4,10 +4,9 @@ import {
   Bell,
   Check,
   CheckCircle2,
-  ChevronRight,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
+  X,} from "lucide-react";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 
 import {
   markAllNotificationsRead,
@@ -102,8 +101,6 @@ export default function NotificationsList({
   initialNotifications,
   initialUnreadCount,
 }: NotificationsListProps) {
-  const router = useRouter();
-
   const [notifications, setNotifications] = useState(
     initialNotifications,
   );
@@ -116,6 +113,7 @@ export default function NotificationsList({
   const [markingId, setMarkingId] = useState<string | null>(
     null,
   );
+  const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
 
   async function handleNotificationClick(
     notification: NotificationItem,
@@ -147,9 +145,7 @@ export default function NotificationsList({
       }
     }
 
-    if (notification.href) {
-      router.push(notification.href);
-    }
+    setSelectedNotification(notification);
   }
 
   async function handleMarkAllAsRead() {
@@ -284,28 +280,68 @@ export default function NotificationsList({
                 {notification.message}
               </p>
 
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-2">
                 <span className="text-xs font-medium text-black/50">
                   {formatDate(notification.createdAt)}
                 </span>
-
-                {notification.href ? (
-                  <>
-                    <span className="text-black/15">
-                      •
-                    </span>
-
-                    <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 opacity-90 transition group-hover:opacity-100">
-                      View
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </span>
-                  </>
-                ) : null}
               </div>
             </div>
           </button>
         ))}
       </div>
+      {selectedNotification && typeof document !== "undefined" ? createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close notification"
+            onClick={() => setSelectedNotification(null)}
+            className="absolute inset-0 bg-black/55"
+          />
+
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="notification-title"
+            className="relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-7"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <span
+                  className={[
+                    "inline-flex rounded-md px-2 py-1 text-[10px] font-black uppercase tracking-wide",
+                    getTypeClasses(selectedNotification.type),
+                  ].join(" ")}
+                >
+                  {getTypeLabel(selectedNotification.type)}
+                </span>
+
+                <h2
+                  id="notification-title"
+                  className="mt-3 text-lg font-black leading-7 text-[#10201b] sm:text-xl"
+                >
+                  {selectedNotification.title}
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                aria-label="Close notification"
+                onClick={() => setSelectedNotification(null)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="mt-5 whitespace-pre-wrap break-words text-base leading-7 text-slate-700 sm:text-lg sm:leading-8">
+              {selectedNotification.message}
+            </p>
+
+            <p className="mt-5 text-xs font-medium text-slate-400">
+              {formatDate(selectedNotification.createdAt)}
+            </p>
+          </section>
+        </div>, document.body) : null}
     </>
   );
 }

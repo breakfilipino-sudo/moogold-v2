@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 
-import type { NotificationType } from "../generated/prisma/client";
+import type { NotificationType } from "../generated/prisma";
 
 type CreateNotificationInput = {
   userId: string;

@@ -27,6 +27,7 @@ import {
   type TranslationKey,
 } from "@/lib/i18n/translations";
 import { prisma } from "@/lib/prisma";
+import { getVerifiedUsdFxRate } from "@/lib/crypto-finance/verified-prices";
 import BalanceVisibility from "@/components/dashboard/wallet/balance-visibility";
 
 function formatCurrency(value: number, currency = "USD") {
@@ -47,43 +48,46 @@ function formatLocalCurrency(value: number, currency: string) {
   }).format(value);
 }
 
+async function convertCurrencyAmount(
+  amount: number,
+  sourceCurrency: string,
+  targetCurrency: string,
+): Promise<number | null> {
+  if (!Number.isFinite(amount)) return null;
+
+  const source = sourceCurrency.trim().toUpperCase();
+  const target = targetCurrency.trim().toUpperCase();
+
+  if (!source || !target) return null;
+  if (source === target) return amount;
+
+  try {
+    const [sourceRate, targetRate] = await Promise.all([
+      getVerifiedUsdFxRate(source),
+      getVerifiedUsdFxRate(target),
+    ]);
+
+    if (
+      !Number.isFinite(sourceRate.rate) ||
+      sourceRate.rate <= 0 ||
+      !Number.isFinite(targetRate.rate) ||
+      targetRate.rate <= 0
+    ) {
+      return null;
+    }
+
+    return (amount / sourceRate.rate) * targetRate.rate;
+  } catch (error) {
+    console.error("Wallet currency conversion error:", error);
+    return null;
+  }
+}
+
 async function getLocalBalance(
   cashBalance: number,
   localCurrency: string,
 ) {
-  if (localCurrency === "USD") {
-    return cashBalance;
-  }
-
-  try {
-    const response = await fetch(
-      `https://api.frankfurter.dev/v2/rate/USD/${encodeURIComponent(
-        localCurrency,
-      )}`,
-      { cache: "no-store" },
-    );
-
-    if (!response.ok) {
-      console.error(
-        "Wallet currency rate request failed:",
-        response.status,
-      );
-      return null;
-    }
-
-    const data = await response.json();
-    const rate = Number(data?.rate);
-
-    if (!Number.isFinite(rate) || rate <= 0) {
-      console.error("Wallet currency rate is invalid:", data);
-      return null;
-    }
-
-    return cashBalance * rate;
-  } catch (error) {
-    console.error("Wallet local currency conversion error:", error);
-    return null;
-  }
+  return convertCurrencyAmount(cashBalance, "USD", localCurrency);
 }
 
 function formatDate(date: Date, locale: string) {
@@ -243,7 +247,7 @@ function ServiceCard({
     return (
       <div
         className={className}
-        aria-label={`${label} — Coming Soon`}
+        aria-label={`${label} â€” Coming Soon`}
       >
         {content}
       </div>
@@ -327,7 +331,6 @@ export default async function WalletPage() {
       wallet: {
         select: {
           cashBalance: true,
-          portfolioValue: true,
           referralBalance: true,
         },
       },
@@ -337,7 +340,36 @@ export default async function WalletPage() {
           value: true,
         },
       },
-      transactions: {
+      regularLoanBalance: {
+        select: {
+          balance: true,
+          currency: true,
+        },
+      },
+      wealthInvestments: {
+        where: {
+          status: {
+            in: ["ACTIVE", "MATURED"],
+          },
+        },
+        select: {
+          principalUsd: true,
+          principalLocal: true,
+          localCurrency: true,
+          accumulatedProfitUsd: true,
+        },
+      },
+      giftCardSubmissions: {
+        where: {
+          status: {
+            in: ["PENDING", "PROCESSING"],
+          },
+        },
+        select: {
+          totalCreditAmount: true,
+          currency: true,
+        },
+      },      transactions: {
         orderBy: {
           createdAt: "desc",
         },
@@ -357,9 +389,6 @@ export default async function WalletPage() {
     walletData?.wallet?.cashBalance ?? 0,
   );
 
-  const portfolioValue = Number(
-    walletData?.wallet?.portfolioValue ?? 0,
-  );
 
   const referralBalance = Number(
     walletData?.wallet?.referralBalance ?? 0,
@@ -384,6 +413,71 @@ export default async function WalletPage() {
     cashBalance,
     localCurrency,
   );
+  const [
+    localGoldValue,
+    localReferralBalance,
+    localLoanBalance,
+  ] = await Promise.all([
+    convertCurrencyAmount(goldValue, "USD", localCurrency),
+    convertCurrencyAmount(referralBalance, "USD", localCurrency),
+    convertCurrencyAmount(
+      Number(walletData?.regularLoanBalance?.balance ?? 0),
+      walletData?.regularLoanBalance?.currency ?? localCurrency,
+      localCurrency,
+    ),
+  ]);
+
+  // Match the existing Wealth Box balance calculation.
+  const wealthInvestments = walletData?.wealthInvestments ?? [];
+
+  const convertedWealthBalances = await Promise.all(
+    wealthInvestments.map((investment) => {
+      const principalUsd = Number(investment.principalUsd);
+      const principalLocal = Number(investment.principalLocal);
+      const accumulatedProfitUsd = Number(investment.accumulatedProfitUsd);
+
+      const profitLocal =
+        principalUsd > 0 && accumulatedProfitUsd > 0
+          ? accumulatedProfitUsd * (principalLocal / principalUsd)
+          : 0;
+
+      return convertCurrencyAmount(
+        principalLocal + profitLocal,
+        investment.localCurrency,
+        localCurrency,
+      );
+    }),
+  );
+
+  const localWealthBoxBalance =
+    convertedWealthBalances.every((amount) => amount !== null)
+      ? convertedWealthBalances.reduce(
+          (total, amount) => total + (amount ?? 0),
+          0,
+        )
+      : null;
+
+  // Approved gift-card redemptions are already included in Available Cash.
+  // Only pending and processing submissions are counted separately.
+  const giftCardSubmissions = walletData?.giftCardSubmissions ?? [];
+
+  const convertedGiftCardAmounts = await Promise.all(
+    giftCardSubmissions.map((submission) =>
+      convertCurrencyAmount(
+        Number(submission.totalCreditAmount),
+        submission.currency,
+        localCurrency,
+      ),
+    ),
+  );
+
+  const localGiftCardBalance =
+    convertedGiftCardAmounts.every((amount) => amount !== null)
+      ? convertedGiftCardAmounts.reduce(
+          (total, amount) => total + (amount ?? 0),
+          0,
+        )
+      : null;
 
 
   const localBalanceDisplay =
@@ -414,16 +508,15 @@ export default async function WalletPage() {
 
   return (
     <div className="space-y-7 pb-10 sm:space-y-8">
+      <p className="text-sm font-medium text-foreground">
+        Hi, {firstName}
+      </p>
+
       <section className="overflow-hidden rounded-[24px] bg-[#10201b] text-white shadow-[0_20px_50px_rgba(16,32,27,0.14)]">
         <div className="relative p-6 sm:p-8">
           <div className="pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full bg-emerald-400/10 blur-2xl" />
           <div className="pointer-events-none absolute -bottom-24 left-1/3 h-48 w-48 rounded-full bg-emerald-300/5 blur-3xl" />
 
-          <div className="relative mb-5 px-1">
-            <p className="text-sm font-medium text-white/65">
-              Hi, {firstName}
-            </p>
-          </div>
 
           <div className="relative">
             <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
@@ -439,16 +532,13 @@ export default async function WalletPage() {
                         ? formatCurrency(cashBalance, "USD")
                         : localBalanceDisplay ?? "\u2014"
                     }
-                    usdBalance={formatCurrency(cashBalance, "USD")}
-                    currency={localCurrency}
-                    availableFundsLabel={t("availableFundsIn")}
                   />
                 </div>
               </div>
 
               <div className="flex flex-wrap gap-3">
                 <Link
-                  href="/dashboard/deposit"
+                  href="/dashboard/deposit-method"
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 text-sm font-bold text-[#10201b] transition hover:bg-emerald-300"
                 >
                   {language === "fil"
@@ -521,12 +611,20 @@ export default async function WalletPage() {
         <div className="divide-y divide-black/5 px-5 sm:px-6">
           <BalanceRow
             label={t("availableCash")}
-            value={formatCurrency(cashBalance)}
+            value={
+              localBalance !== null
+                ? formatLocalCurrency(localBalance, localCurrency)
+                : "\u2014"
+            }
           />
 
           <BalanceRow
             label={t("goldHoldings")}
-            value={formatCurrency(goldValue)}
+            value={
+              localGoldValue !== null
+                ? formatLocalCurrency(localGoldValue, localCurrency)
+                : "\u2014"
+            }
             secondary={
               goldQuantity > 0
                 ? `${goldQuantity.toFixed(4)} oz`
@@ -535,15 +633,32 @@ export default async function WalletPage() {
           />
 
           <BalanceRow
-            label={t("portfolio")}
-            value={formatCurrency(portfolioValue)}
+            label={wealthBoxLabel}
+            value={
+              localWealthBoxBalance !== null
+                ? formatLocalCurrency(localWealthBoxBalance, localCurrency)
+                : "\u2014"
+            }
           />
 
           <BalanceRow
-            label={t("referralEarnings")}
-            value={formatCurrency(referralBalance)}
+            label={loanLabel}
+            value={
+              localLoanBalance !== null
+                ? formatLocalCurrency(localLoanBalance, localCurrency)
+                : "\u2014"
+            }
           />
-        </div>
+
+
+          <BalanceRow
+            label={t("referralEarnings")}
+            value={
+              localReferralBalance !== null
+                ? formatLocalCurrency(localReferralBalance, localCurrency)
+                : "\u2014"
+            }
+          /></div>
       </CollapsibleSection>
 
       <CollapsibleSection

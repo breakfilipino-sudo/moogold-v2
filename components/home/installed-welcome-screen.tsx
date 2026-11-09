@@ -54,7 +54,7 @@ const copy: Record<LanguageCode, WelcomeCopy> = {
       },
       {
         title: "Gift Cards",
-        description: "Buy and sell gift cards.",
+        description: "Redeem gift cards.",
         icon: Gift,
       },
       {
@@ -274,7 +274,7 @@ export default function InstalledWelcomeScreen({
             width={160}
             height={160}
             priority
-            className="h-16 w-16 object-contain sm:h-20 sm:w-20"
+            className="h-8 w-8 object-contain sm:h-10 sm:w-10"
           />
         </div>
         <div>

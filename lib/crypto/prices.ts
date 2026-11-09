@@ -1,4 +1,4 @@
-﻿export const CRYPTO_ASSETS = [
+export const CRYPTO_ASSETS = [
   "USDC",
   "USDT",
   "BTC",
@@ -8,25 +8,46 @@
   "XLM",
 ] as const;
 
+/** Assets supported by the existing trading and withdrawal flows. */
 export type CryptoAssetCode = (typeof CRYPTO_ASSETS)[number];
 
-const COINGECKO_IDS: Partial<Record<CryptoAssetCode, string>> = {
+/** Additional assets accepted for deposits only. */
+export const DEPOSIT_CRYPTO_ASSETS = [
+  ...CRYPTO_ASSETS,
+  "BNB",
+  "TRX",
+  "SUI",
+] as const;
+
+export type DepositCryptoAssetCode =
+  (typeof DEPOSIT_CRYPTO_ASSETS)[number];
+
+const COINGECKO_IDS: Partial<
+  Record<DepositCryptoAssetCode, string>
+> = {
+  USDC: "usd-coin",
+  USDT: "tether",
   BTC: "bitcoin",
   ETH: "ethereum",
   SOL: "solana",
   TRN: "tron",
   XLM: "stellar",
+  BNB: "binancecoin",
+  TRX: "tron",
+  SUI: "sui",
 };
 
-export type CryptoUsdPrices = Partial<Record<CryptoAssetCode, number>>;
+export type CryptoUsdPrices = Partial<
+  Record<DepositCryptoAssetCode, number>
+>;
 
 /**
  * Returns available USD reference prices.
  * Missing prices are intentionally omitted, never treated as zero.
  */
 export async function getCryptoUsdPrices(): Promise<CryptoUsdPrices> {
-  const prices: CryptoUsdPrices = { USDC: 1, USDT: 1 };
-  const ids = Object.values(COINGECKO_IDS);
+  const prices: CryptoUsdPrices = {};
+  const ids = [...new Set(Object.values(COINGECKO_IDS))];
 
   try {
     const response = await fetch(
@@ -46,11 +67,16 @@ export async function getCryptoUsdPrices(): Promise<CryptoUsdPrices> {
     >;
 
     for (const [asset, coinId] of Object.entries(COINGECKO_IDS) as [
-      CryptoAssetCode,
+      DepositCryptoAssetCode,
       string,
     ][]) {
       const price = data[coinId]?.usd;
-      if (typeof price === "number" && Number.isFinite(price) && price > 0) {
+
+      if (
+        typeof price === "number" &&
+        Number.isFinite(price) &&
+        price > 0
+      ) {
         prices[asset] = price;
       }
     }

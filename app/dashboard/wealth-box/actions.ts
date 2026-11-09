@@ -1,5 +1,13 @@
 "use server";
 
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { Prisma } from "@/generated/prisma";
+import type { DepositCryptoAssetCode } from "@/lib/crypto/prices";
+import {
+  getVerifiedCryptoUsdPrice,
+  getVerifiedUsdFxRate,
+} from "@/lib/crypto-finance/verified-prices";
+
 import { sendAdminEmailAlert } from "@/lib/admin-email-alerts";
 import { revalidatePath } from "next/cache";
 
@@ -13,53 +21,67 @@ const CARD_PAYMENT_URL =
   "https://elderlycarepays.wordpress.com/";
 
 const CRYPTO_OPTIONS = {
-  USDC: {
-    network: "ETHEREUM" as const,
-    networkLabel: "Ethereum (ERC-20)",
-    receivingAddress:
-      "0x12C844aeA5FFe9271fb6f2F1e1fd1811512B4ad1",
-  },
-
   USDT: {
     network: "TRON" as const,
-    networkLabel: "Tron (TRC-20)",
-    receivingAddress:
-      "TKrbT8qikYzZd8tBwPQ2teaLZCV4aJ5NKg",
+    networkLabel: "Tron (TRC20)",
+    receivingAddress: "TJKxnXkwhH8fC9qY9g8YXvCoHSqyZ1oR12",
+    memo: undefined,
+  },
+
+  USDC: {
+    network: "ETHEREUM" as const,
+    networkLabel: "Ethereum (ERC20)",
+    receivingAddress: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+    memo: undefined,
   },
 
   BTC: {
     network: "BITCOIN" as const,
     networkLabel: "Bitcoin",
-    receivingAddress:
-      "33a54tDd51n13TMYi6KqZ3WUdo2LpQcnqC",
+    receivingAddress: "16GZmP9ybu1m1wYvzG5D4Q6aCrxn3ebYgU",
+    memo: undefined,
+  },
+
+  BNB: {
+    network: "BNB_SMART_CHAIN" as const,
+    networkLabel: "BNB Smart Chain (BEP20)",
+    receivingAddress: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+    memo: undefined,
   },
 
   ETH: {
     network: "ETHEREUM" as const,
-    networkLabel: "Ethereum (ERC-20)",
-    receivingAddress:
-      "0xae70A129dfd37186C70697494B08c4151C408717",
+    networkLabel: "Ethereum (ERC20)",
+    receivingAddress: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+    memo: undefined,
   },
 
   SOL: {
     network: "SOLANA" as const,
     networkLabel: "Solana",
-    receivingAddress:
-      "GFenbSRhcZwPg7KE85AJS4AB7khUeVdBkUSQjuJj2xDj",
-  },
-
-  TRN: {
-    network: "TRON" as const,
-    networkLabel: "Tron",
-    receivingAddress:
-      "TLGGvkFbJWtT3jvxx8uss14Mshmrz7Kenx",
+    receivingAddress: "orwuXMAC81ivmAKR5X4oB4hpvRzmfE7jSUXdrjQYgkv",
+    memo: undefined,
   },
 
   XLM: {
     network: "STELLAR" as const,
     networkLabel: "Stellar",
-    receivingAddress:
-      "GD5LP2XKZV2QJBY3VIJTTC6ECN3LGJQMCJXSAYPPXZHWGVTJOQM5H3MP",
+    receivingAddress: "GABFQIK63R2NETJM7T673EAMZN4RJLLGP3OFUEJU5SZVTGWUKULZJNL6",
+    memo: "401607474",
+  },
+
+  TRX: {
+    network: "TRON" as const,
+    networkLabel: "Tron (TRC20)",
+    receivingAddress: "TJKxnXkwhH8fC9qY9g8YXvCoHSqyZ1oR12",
+    memo: undefined,
+  },
+
+  SUI: {
+    network: "SUI" as const,
+    networkLabel: "Sui",
+    receivingAddress: "0xfe65cba4a2b4f67b13e68c548460d129fa0b0b9cae6f6e2d5d8ce0adaa94c8ab",
+    memo: undefined,
   },
 } as const;
 
@@ -91,8 +113,10 @@ type CryptoFundingResult =
       network: string;
       networkLabel: string;
       receivingAddress: string;
+      memo: string | null;
       localAmount: number;
       usdAmount: number;
+      cryptoAmount: string;
       payoutDate: string;
       status: string;
     }
@@ -101,6 +125,205 @@ type CryptoFundingResult =
       error: string;
     };
 
+type CryptoWealthQuotePayload = {
+  version: 1;
+  userId: string;
+  planId: string;
+  localAmount: number;
+  currency: string;
+  asset: CryptoAsset;
+  usdAmount: number;
+  localToUsdRate: number;
+  fxSource: string;
+  fxObservedAt: string;
+  cryptoUsdPrice: number;
+  cryptoPriceSource: string;
+  cryptoPriceObservedAt: string;
+  cryptoAmount: string;
+  issuedAt: number;
+  expiresAt: number;
+};
+
+type CryptoWealthQuoteResult =
+  | {
+      success: true;
+      token: string;
+      localAmount: number;
+      currency: string;
+      usdAmount: number;
+      asset: CryptoAsset;
+      cryptoAmount: string;
+      localToUsdRate: number;
+      fxSource: string;
+      fxObservedAt: string;
+      cryptoUsdPrice: number;
+      cryptoPriceSource: string;
+      cryptoPriceObservedAt: string;
+      expiresAt: string;
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
+const CRYPTO_WEALTH_QUOTE_TTL_MS = 60 * 1000;
+
+function getCryptoWealthSigningSecret(): string {
+  const secret = process.env.MOOGOLD_AUTH_SECRET;
+
+  if (!secret || secret.length < 32) {
+    throw new Error(
+      "Secure crypto quote signing is unavailable. Please contact support.",
+    );
+  }
+
+  return secret;
+}
+
+function signCryptoWealthQuote(
+  payload: CryptoWealthQuotePayload,
+): string {
+  const encoded = Buffer
+    .from(JSON.stringify(payload))
+    .toString("base64url");
+
+  const signature = createHmac(
+    "sha256",
+    getCryptoWealthSigningSecret(),
+  )
+    .update(encoded)
+    .digest("base64url");
+
+  return `${encoded}.${signature}`;
+}
+
+function verifyCryptoWealthQuote(
+  token: string,
+): CryptoWealthQuotePayload {
+  if (
+    typeof token !== "string" ||
+    token.length === 0 ||
+    token.length > 12000
+  ) {
+    throw new Error(
+      "The crypto quote is invalid. Please refresh the quote.",
+    );
+  }
+
+  const parts = token.split(".");
+
+  if (parts.length !== 2) {
+    throw new Error(
+      "The crypto quote is invalid. Please refresh the quote.",
+    );
+  }
+
+  const [encoded, suppliedSignature] = parts;
+
+  if (
+    !/^[A-Za-z0-9_-]+$/.test(encoded) ||
+    !/^[A-Za-z0-9_-]+$/.test(suppliedSignature)
+  ) {
+    throw new Error(
+      "The crypto quote is invalid. Please refresh the quote.",
+    );
+  }
+
+  const expectedSignature = createHmac(
+    "sha256",
+    getCryptoWealthSigningSecret(),
+  )
+    .update(encoded)
+    .digest();
+
+  const actualSignature = Buffer.from(
+    suppliedSignature,
+    "base64url",
+  );
+
+  if (
+    actualSignature.length !== expectedSignature.length ||
+    !timingSafeEqual(actualSignature, expectedSignature)
+  ) {
+    throw new Error(
+      "The crypto quote could not be verified. Please refresh the quote.",
+    );
+  }
+
+  let payload: unknown;
+
+  try {
+    payload = JSON.parse(
+      Buffer.from(encoded, "base64url").toString("utf8"),
+    );
+  } catch {
+    throw new Error(
+      "The crypto quote is invalid. Please refresh the quote.",
+    );
+  }
+
+  if (
+    typeof payload !== "object" ||
+    payload === null
+  ) {
+    throw new Error(
+      "The crypto quote is invalid. Please refresh the quote.",
+    );
+  }
+
+  const quote = payload as Partial<CryptoWealthQuotePayload>;
+
+  const numericFields = [
+    quote.localAmount,
+    quote.usdAmount,
+    quote.localToUsdRate,
+    quote.cryptoUsdPrice,
+    quote.issuedAt,
+    quote.expiresAt,
+  ];
+
+  if (
+    quote.version !== 1 ||
+    typeof quote.userId !== "string" ||
+    typeof quote.planId !== "string" ||
+    typeof quote.currency !== "string" ||
+    typeof quote.asset !== "string" ||
+    !Object.prototype.hasOwnProperty.call(
+      CRYPTO_OPTIONS,
+      quote.asset,
+    ) ||
+    typeof quote.fxSource !== "string" ||
+    typeof quote.fxObservedAt !== "string" ||
+    typeof quote.cryptoPriceSource !== "string" ||
+    typeof quote.cryptoPriceObservedAt !== "string" ||
+    typeof quote.cryptoAmount !== "string" ||
+    !numericFields.every(
+      (value) =>
+        typeof value === "number" &&
+        Number.isFinite(value) &&
+        value > 0,
+    )
+  ) {
+    throw new Error(
+      "The crypto quote is invalid. Please refresh the quote.",
+    );
+  }
+
+  const now = Date.now();
+
+  if (
+    quote.expiresAt! <= now ||
+    quote.issuedAt! > now + 5000 ||
+    quote.expiresAt! - quote.issuedAt! !==
+      CRYPTO_WEALTH_QUOTE_TTL_MS
+  ) {
+    throw new Error(
+      "Your crypto quote has expired. Please refresh the quote before continuing.",
+    );
+  }
+
+  return quote as CryptoWealthQuotePayload;
+}
 function generateFundingReference() {
   const timestamp = Date.now()
     .toString(36)
@@ -131,6 +354,21 @@ function getCryptoAsset(
   return normalized as CryptoAsset;
 }
 
+function getCryptoAssetDecimals(asset: CryptoAsset): number {
+  const decimals: Record<CryptoAsset, number> = {
+    USDC: 6,
+    USDT: 6,
+    BTC: 8,
+    BNB: 18,
+    ETH: 18,
+    SOL: 9,
+    XLM: 7,
+    TRX: 6,
+    SUI: 9,
+  };
+
+  return decimals[asset];
+}
 async function getLocalToUsdRate(
   localCurrency: string,
 ) {
@@ -172,6 +410,7 @@ async function getLocalToUsdRate(
 async function getValidatedFundingDetails(
   planId: string,
   amount: string,
+  localToUsdRateOverride?: number | null,
 ) {
   if (!planId) {
     throw new Error(
@@ -258,10 +497,43 @@ async function getValidatedFundingDetails(
   }
 
 
-  const localToUsdRate =
-    await getLocalToUsdRate(
-      countryConfig.currency,
+  const maximumLocalAmount =
+    countryConfig.maximumLocalAmount === null
+      ? null
+      : Number(countryConfig.maximumLocalAmount);
+
+  if (
+    maximumLocalAmount !== null &&
+    (!Number.isFinite(maximumLocalAmount) || maximumLocalAmount <= 0)
+  ) {
+    throw new Error(
+      "This investment plan has an invalid maximum amount.",
     );
+  }
+
+  if (
+    maximumLocalAmount !== null &&
+    roundedLocalAmount > maximumLocalAmount
+  ) {
+    throw new Error(
+      `The maximum investment is ${countryConfig.currencySymbol}${maximumLocalAmount.toLocaleString("en-US")}.`,
+    );
+  }
+  const localToUsdRate =
+    localToUsdRateOverride === null
+      ? 1
+      : localToUsdRateOverride === undefined
+        ? await getLocalToUsdRate(countryConfig.currency)
+        : localToUsdRateOverride;
+
+  if (
+    !Number.isFinite(localToUsdRate) ||
+    localToUsdRate <= 0
+  ) {
+    throw new Error(
+      "The verified exchange rate is invalid. Please refresh the quote.",
+    );
+  }
 
   const usdAmountRaw =
     roundedLocalAmount * localToUsdRate;
@@ -465,6 +737,166 @@ export async function createCardWealthFunding(
   }
 }
 
+
+/*
+ * ============================================================
+ * CREATE LOCAL PAYMENT WEALTH FUNDING
+ * ============================================================
+ *
+ * GCash, Maya and Touch 'n Go create pending funding requests.
+ * They do not create investments or credit wallet balances.
+ * ============================================================
+ */
+
+export async function createLocalWealthFunding(
+  planId: string,
+  amount: string,
+  method: "GCASH" | "MAYA" | "TOUCH_N_GO",
+): Promise<WealthFundingResult> {
+  try {
+    const details = await getValidatedFundingDetails(
+      planId,
+      amount,
+    );
+
+    const countryCode = String(
+      details.user.countryCode ?? "",
+    ).toUpperCase();
+
+    const allowed =
+      (countryCode === "PH" &&
+        (method === "GCASH" || method === "MAYA")) ||
+      (countryCode === "MY" && method === "TOUCH_N_GO");
+
+    if (!allowed) {
+      throw new Error(
+        "This payment method is not available for your registered country.",
+      );
+    }
+
+    const reference = generateFundingReference();
+
+    const funding = await prisma.wealthFunding.create({
+      data: {
+        userId: details.user.id,
+        planId: details.plan.id,
+        paymentMethod: method,
+        status: "PENDING",
+        principalLocal: details.roundedLocalAmount,
+        principalUsd: details.usdAmount,
+        localCurrency: details.countryConfig.currency,
+        exchangeRate: details.localToUsdRate,
+        returnPercentage: details.returnPercentage,
+        projectedProfitUsd: details.projectedProfitUsd,
+        maturityAmountUsd: details.maturityAmountUsd,
+        durationDays: details.durationDays,
+        payoutDate: details.payoutDate,
+        externalReference: reference,
+      },
+      select: {
+        id: true,
+        status: true,
+        principalLocal: true,
+        principalUsd: true,
+        exchangeRate: true,
+        maturityAmountUsd: true,
+        payoutDate: true,
+      },
+    });
+
+    revalidatePath("/dashboard/wealth-box");
+
+    void sendAdminEmailAlert({
+      subject: `Wealth Box ${method} funding awaiting review`,
+      message:
+        `A Wealth Box ${method} funding request was created.\n` +
+        `Funding ID: ${funding.id}\n` +
+        `Reference: ${reference}\n` +
+        `Customer: ${details.user.id}\n` +
+        `Country: ${countryCode}\n` +
+        `Local amount: ${Number(funding.principalLocal)} ${details.countryConfig.currency}\n` +
+        `USD amount: $${Number(funding.principalUsd)}\n` +
+        `Status: ${funding.status}`,
+    });
+
+    return {
+      success: true,
+      fundingId: funding.id,
+      status: funding.status,
+      localAmount: Number(funding.principalLocal),
+      usdAmount: Number(funding.principalUsd),
+      exchangeRate: Number(funding.exchangeRate),
+      maturityAmountUsd: Number(funding.maturityAmountUsd),
+      payoutDate: funding.payoutDate.toISOString(),
+      reference,
+    };
+  } catch (error) {
+    console.error(
+      "Failed to create local Wealth Box funding:",
+      error,
+    );
+
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to create your funding request. Please try again.",
+    };
+  }
+}
+
+/*
+ * ============================================================
+ * CHECK LOCAL WEALTH FUNDING GATEWAY
+ * ============================================================
+ *
+ * Only pending GCash and Touch 'n Go requests can receive
+ * an admin-provided gateway URL.
+ * ============================================================
+ */
+
+export async function getLocalWealthFundingGatewayUrl(
+  fundingId: string,
+): Promise<string | null> {
+  try {
+    if (!fundingId?.trim()) return null;
+
+    const { user } = await getCurrentUser();
+
+    const funding = await prisma.wealthFunding.findFirst({
+      where: {
+        id: fundingId,
+        userId: user.id,
+        status: "PENDING",
+        paymentMethod: {
+          in: ["GCASH", "TOUCH_N_GO"],
+        },
+      },
+      select: {
+        gatewayUrl: true,
+      },
+    });
+
+    const rawUrl = funding?.gatewayUrl?.trim();
+
+    if (!rawUrl) return null;
+
+    const parsedUrl = new URL(rawUrl);
+
+    if (
+      parsedUrl.protocol !== "https:" ||
+      parsedUrl.username ||
+      parsedUrl.password
+    ) {
+      return null;
+    }
+
+    return parsedUrl.toString();
+  } catch {
+    return null;
+  }
+}
 /*
  * ============================================================
  * CREATE CRYPTO WEALTH FUNDING
@@ -484,145 +916,351 @@ export async function createCardWealthFunding(
  * ============================================================
  */
 
+export async function createCryptoWealthFundingQuote(
+  planId: string,
+  amount: string,
+  assetInput: string,
+): Promise<CryptoWealthQuoteResult> {
+  try {
+    const asset = getCryptoAsset(assetInput);
+
+    if (!asset) {
+      throw new Error(
+        "Please choose a supported cryptocurrency.",
+      );
+    }
+
+    const initialDetails =
+      await getValidatedFundingDetails(
+        planId,
+        amount,
+        null,
+      );
+
+    const fxRate = await getVerifiedUsdFxRate(
+      initialDetails.countryConfig.currency,
+    );
+
+    if (
+      !Number.isFinite(fxRate.rate) ||
+      fxRate.rate <= 0 ||
+      !(fxRate.observedAt instanceof Date) ||
+      Number.isNaN(fxRate.observedAt.getTime())
+    ) {
+      throw new Error(
+        "The verified exchange rate is unavailable. Please refresh the quote.",
+      );
+    }
+
+    const localToUsdRate = Number(
+      (1 / fxRate.rate).toFixed(8),
+    );
+
+    if (
+      !Number.isFinite(localToUsdRate) ||
+      localToUsdRate <= 0
+    ) {
+      throw new Error(
+        "The verified exchange rate is invalid. Please refresh the quote.",
+      );
+    }
+
+    const details = await getValidatedFundingDetails(
+      planId,
+      amount,
+      localToUsdRate,
+    );
+
+    const cryptoRate = await getVerifiedCryptoUsdPrice(
+      asset as DepositCryptoAssetCode,
+    );
+
+    if (
+      !Number.isFinite(cryptoRate.rate) ||
+      cryptoRate.rate <= 0 ||
+      !(cryptoRate.observedAt instanceof Date) ||
+      Number.isNaN(cryptoRate.observedAt.getTime())
+    ) {
+      throw new Error(
+        "The verified cryptocurrency price is unavailable. Please refresh the quote.",
+      );
+    }
+
+    const cryptoUsdPriceDecimal =
+      new Prisma.Decimal(cryptoRate.rate)
+        .toDecimalPlaces(8);
+
+    if (!cryptoUsdPriceDecimal.isPositive()) {
+      throw new Error(
+        "The verified cryptocurrency price is invalid. Please refresh the quote.",
+      );
+    }
+
+    const usdPrincipalDecimal =
+      new Prisma.Decimal(
+        details.usdAmount.toFixed(2),
+      );
+
+    const cryptoAmountDecimal =
+      usdPrincipalDecimal
+        .div(cryptoUsdPriceDecimal)
+        .toDecimalPlaces(
+          getCryptoAssetDecimals(asset),
+          Prisma.Decimal.ROUND_UP,
+        );
+
+    if (
+      !cryptoAmountDecimal.isFinite() ||
+      !cryptoAmountDecimal.isPositive()
+    ) {
+      throw new Error(
+        "The cryptocurrency payment amount could not be calculated.",
+      );
+    }
+
+    const cryptoAmount = cryptoAmountDecimal.toFixed(
+      getCryptoAssetDecimals(asset),
+    );
+
+    const issuedAt = Date.now();
+    const expiresAt =
+      issuedAt + CRYPTO_WEALTH_QUOTE_TTL_MS;
+
+    const payload: CryptoWealthQuotePayload = {
+      version: 1,
+      userId: details.user.id,
+      planId: details.plan.id,
+      localAmount: details.roundedLocalAmount,
+      currency: details.countryConfig.currency,
+      asset,
+      usdAmount: details.usdAmount,
+      localToUsdRate,
+      fxSource: fxRate.source,
+      fxObservedAt: fxRate.observedAt.toISOString(),
+      cryptoUsdPrice: cryptoUsdPriceDecimal.toNumber(),
+      cryptoPriceSource: cryptoRate.source,
+      cryptoPriceObservedAt:
+        cryptoRate.observedAt.toISOString(),
+      cryptoAmount,
+      issuedAt,
+      expiresAt,
+    };
+
+    const token = signCryptoWealthQuote(payload);
+
+    return {
+      success: true,
+      token,
+      localAmount: details.roundedLocalAmount,
+      currency: details.countryConfig.currency,
+      usdAmount: details.usdAmount,
+      asset,
+      cryptoAmount,
+      localToUsdRate,
+      fxSource: fxRate.source,
+      fxObservedAt: fxRate.observedAt.toISOString(),
+      cryptoUsdPrice: cryptoUsdPriceDecimal.toNumber(),
+      cryptoPriceSource: cryptoRate.source,
+      cryptoPriceObservedAt:
+        cryptoRate.observedAt.toISOString(),
+      expiresAt: new Date(expiresAt).toISOString(),
+    };
+  } catch (error) {
+    console.error(
+      "Failed to create Wealth Box crypto quote:",
+      error,
+    );
+
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to calculate the crypto payment amount. Please try again.",
+    };
+  }
+}
 export async function createCryptoWealthFunding(
   planId: string,
   amount: string,
   assetInput: string,
+  quoteToken: string,
 ): Promise<CryptoFundingResult> {
   try {
-    const asset =
-      getCryptoAsset(assetInput);
+    const asset = getCryptoAsset(assetInput);
 
     if (!asset) {
-      return {
-        success: false,
-        error:
-          "Please choose a supported cryptocurrency.",
-      };
+      throw new Error(
+        "Please choose a supported cryptocurrency.",
+      );
     }
 
-    const details =
-      await getValidatedFundingDetails(
-        planId,
-        amount,
+    const quote = verifyCryptoWealthQuote(quoteToken);
+
+    if (
+      quote.planId !== planId ||
+      quote.asset !== asset ||
+      !Number.isFinite(quote.localAmount) ||
+      !Number.isFinite(quote.usdAmount) ||
+      !Number.isFinite(quote.localToUsdRate) ||
+      !Number.isFinite(quote.cryptoUsdPrice) ||
+      !quote.fxSource.trim() ||
+      !quote.cryptoPriceSource.trim() ||
+      Number.isNaN(Date.parse(quote.fxObservedAt)) ||
+      Number.isNaN(Date.parse(quote.cryptoPriceObservedAt))
+    ) {
+      throw new Error(
+        "The crypto quote does not match this payment. Please refresh the quote.",
       );
+    }
 
-    const cryptoOption =
-      CRYPTO_OPTIONS[asset];
+    const quotedCryptoAmount =
+      new Prisma.Decimal(quote.cryptoAmount);
 
-    const reference =
-      generateFundingReference();
+    const quotedCryptoPrice =
+      new Prisma.Decimal(quote.cryptoUsdPrice)
+        .toDecimalPlaces(8);
 
-    const result =
-      await prisma.$transaction(
-        async (tx) => {
-          const cryptoBalance =
-            await tx.cryptoBalance.upsert({
-              where: {
-                userId_asset_network: {
-                  userId: details.user.id,
-                  asset,
-                  network:
-                    cryptoOption.network,
-                },
-              },
-
-              update: {},
-
-              create: {
-                userId: details.user.id,
-                asset,
-                network:
-                  cryptoOption.network,
-                balance: 0,
-              },
-            });
-
-          const cryptoDeposit =
-            await tx.cryptoDeposit.create({
-              data: {
-                userId: details.user.id,
-
-                cryptoBalanceId:
-                  cryptoBalance.id,
-
-                asset,
-
-                network:
-                  cryptoOption.network,
-
-                receivingAddress:
-                  cryptoOption.receivingAddress,
-
-                status: "PENDING",
-
-                description:
-                  `Wealth Box funding reported using ${asset} via ${cryptoOption.networkLabel}. Awaiting MooGold payment verification.`,
-              },
-
-              select: {
-                id: true,
-              },
-            });
-
-          const funding =
-            await tx.wealthFunding.create({
-              data: {
-                userId: details.user.id,
-                planId: details.plan.id,
-
-                paymentMethod: "CRYPTO",
-                status: "PENDING",
-
-                principalLocal:
-                  details.roundedLocalAmount,
-
-                principalUsd:
-                  details.usdAmount,
-
-                localCurrency:
-                  details.countryConfig.currency,
-
-                exchangeRate:
-                  details.localToUsdRate,
-
-                returnPercentage: details.returnPercentage,
-
-                projectedProfitUsd:
-                  details.projectedProfitUsd,
-
-                maturityAmountUsd:
-                  details.maturityAmountUsd,
-
-                durationDays:
-                  details.durationDays,
-
-                payoutDate:
-                  details.payoutDate,
-
-                cryptoDepositId:
-                  cryptoDeposit.id,
-
-                externalReference:
-                  reference,
-              },
-
-              select: {
-                id: true,
-                status: true,
-              },
-            });
-
-          return {
-            funding,
-            cryptoDeposit,
-          };
-        },
+    if (
+      !quotedCryptoAmount.isFinite() ||
+      !quotedCryptoAmount.isPositive() ||
+      !quotedCryptoPrice.isFinite() ||
+      !quotedCryptoPrice.isPositive() ||
+      quotedCryptoAmount.decimalPlaces() >
+        getCryptoAssetDecimals(asset) ||
+      quotedCryptoPrice.toFixed(8) !==
+        quote.cryptoUsdPrice.toFixed(8)
+    ) {
+      throw new Error(
+        "The crypto quote contains invalid payment values. Please refresh the quote.",
       );
+    }
 
-    revalidatePath(
-      "/dashboard/wealth-box",
+    const details = await getValidatedFundingDetails(
+      planId,
+      amount,
+      quote.localToUsdRate,
     );
+
+    if (
+      details.user.id !== quote.userId ||
+      details.plan.id !== quote.planId ||
+      details.countryConfig.currency !== quote.currency ||
+      details.roundedLocalAmount.toFixed(2) !==
+        quote.localAmount.toFixed(2) ||
+      details.localToUsdRate.toFixed(8) !==
+        quote.localToUsdRate.toFixed(8) ||
+      details.usdAmount.toFixed(2) !==
+        quote.usdAmount.toFixed(2)
+    ) {
+      throw new Error(
+        "Your payment details have changed. Please refresh the crypto quote.",
+      );
+    }
+
+    const expectedCryptoAmount =
+      new Prisma.Decimal(
+        details.usdAmount.toFixed(2),
+      )
+        .div(quotedCryptoPrice)
+        .toDecimalPlaces(
+          getCryptoAssetDecimals(asset),
+          Prisma.Decimal.ROUND_UP,
+        );
+
+    if (
+      expectedCryptoAmount.toFixed(
+        getCryptoAssetDecimals(asset),
+      ) !== quote.cryptoAmount
+    ) {
+      throw new Error(
+        "The quoted crypto amount could not be verified. Please refresh the quote.",
+      );
+    }
+
+    const cryptoOption = CRYPTO_OPTIONS[asset];
+    const reference = generateFundingReference();
+
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const cryptoBalance =
+          await tx.cryptoBalance.upsert({
+            where: {
+              userId_asset_network: {
+                userId: details.user.id,
+                asset,
+                network: cryptoOption.network,
+              },
+            },
+            update: {},
+            create: {
+              userId: details.user.id,
+              asset,
+              network: cryptoOption.network,
+              balance: 0,
+            },
+          });
+
+        const cryptoDeposit =
+          await tx.cryptoDeposit.create({
+            data: {
+              userId: details.user.id,
+              cryptoBalanceId: cryptoBalance.id,
+              asset,
+              network: cryptoOption.network,
+              receivingAddress:
+                cryptoOption.receivingAddress,
+              memo: cryptoOption.memo ?? null,
+              amount: quotedCryptoAmount.toFixed(
+                getCryptoAssetDecimals(asset),
+              ),
+              usdAmount: details.usdAmount.toFixed(2),
+              exchangeRate: quotedCryptoPrice.toFixed(8),
+              status: "PENDING",
+              description:
+                `Wealth Box funding reported using ${asset} via ${cryptoOption.networkLabel}. ` +
+                `Quoted payment: ${quote.cryptoAmount} ${asset}. ` +
+                `Awaiting MooGold payment verification.`,
+            },
+            select: {
+              id: true,
+            },
+          });
+
+        const funding = await tx.wealthFunding.create({
+          data: {
+            userId: details.user.id,
+            planId: details.plan.id,
+            paymentMethod: "CRYPTO",
+            status: "PENDING",
+            principalLocal: details.roundedLocalAmount,
+            principalUsd: details.usdAmount,
+            localCurrency: details.countryConfig.currency,
+            exchangeRate: details.localToUsdRate,
+            returnPercentage: details.returnPercentage,
+            projectedProfitUsd:
+              details.projectedProfitUsd,
+            maturityAmountUsd:
+              details.maturityAmountUsd,
+            durationDays: details.durationDays,
+            payoutDate: details.payoutDate,
+            cryptoDepositId: cryptoDeposit.id,
+            externalReference: reference,
+          },
+          select: {
+            id: true,
+            status: true,
+          },
+        });
+
+        return {
+          funding,
+          cryptoDeposit,
+        };
+      },
+    );
+
+    revalidatePath("/dashboard/wealth-box");
 
     void sendAdminEmailAlert({
       subject: "Wealth Box crypto funding awaiting review",
@@ -631,31 +1269,33 @@ export async function createCryptoWealthFunding(
         `Funding ID: ${result.funding.id}\n` +
         `Crypto deposit ID: ${result.cryptoDeposit.id}\n` +
         `Reference: ${reference}\n` +
-        `Asset: ${asset}\n` +
-        `Network: ${cryptoOption.networkLabel}\n` +
-        `USD amount: $${details.usdAmount}\n` +
+        `Local investment: ${details.roundedLocalAmount} ${details.countryConfig.currency}\n` +
+        `USD principal: $${details.usdAmount.toFixed(2)}\n` +
+        `Crypto payment: ${quote.cryptoAmount} ${asset}\n` +
+        `Crypto network: ${cryptoOption.networkLabel}\n` +
+        `Crypto USD price: $${quotedCryptoPrice.toFixed(8)}\n` +
+        `Crypto price source: ${quote.cryptoPriceSource}\n` +
+        `Crypto price observed: ${quote.cryptoPriceObservedAt}\n` +
+        `Local-to-USD rate: ${quote.localToUsdRate.toFixed(8)}\n` +
+        `FX source: ${quote.fxSource}\n` +
+        `FX observed: ${quote.fxObservedAt}\n` +
         `Status: ${result.funding.status}`,
     });
+
     return {
       success: true,
       fundingId: result.funding.id,
-      cryptoDepositId:
-        result.cryptoDeposit.id,
+      cryptoDepositId: result.cryptoDeposit.id,
       asset,
-      network:
-        cryptoOption.network,
-      networkLabel:
-        cryptoOption.networkLabel,
-      receivingAddress:
-        cryptoOption.receivingAddress,
-      localAmount:
-        details.roundedLocalAmount,
-      usdAmount:
-        details.usdAmount,
-      payoutDate:
-        details.payoutDate.toISOString(),
-      status:
-        result.funding.status,
+      network: cryptoOption.network,
+      networkLabel: cryptoOption.networkLabel,
+      receivingAddress: cryptoOption.receivingAddress,
+      memo: cryptoOption.memo ?? null,
+      localAmount: details.roundedLocalAmount,
+      usdAmount: details.usdAmount,
+      cryptoAmount: quote.cryptoAmount,
+      payoutDate: details.payoutDate.toISOString(),
+      status: result.funding.status,
     };
   } catch (error) {
     console.error(
@@ -672,10 +1312,8 @@ export async function createCryptoWealthFunding(
     };
   }
 }
-
-
 // ============================================================
-// MOO GOLD SPECIAL CARD Ã¢â‚¬â€ CUSTOMER SUBMISSION AND VERIFICATION
+// MOO GOLD SPECIAL CARD ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â CUSTOMER SUBMISSION AND VERIFICATION
 // ============================================================
 
 export async function createSpecialCardSubmission(formData: FormData) {

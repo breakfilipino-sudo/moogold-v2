@@ -138,9 +138,9 @@ export default function SellGoldForm({
 
   return (
     <>
-      <div className="rounded-2xl border border-black/5 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.06)]">
         {/* Header */}
-        <div className="border-b border-black/5 px-5 py-4 sm:px-6">
+        <div className="border-b border-slate-100 bg-gradient-to-r from-[#fbfcfa] to-white px-5 py-5 sm:px-6">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black/30">
@@ -152,7 +152,7 @@ export default function SellGoldForm({
               </h2>
             </div>
 
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#f8e8bd] to-[#e8c778] text-[#735018] shadow-sm">
               <ArrowUpFromLine className="h-4 w-4" />
             </div>
           </div>

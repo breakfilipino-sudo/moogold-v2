@@ -4,6 +4,7 @@ ArrowLeft,
 ArrowRight,
 Bitcoin,
 CreditCard,
+  Wallet,
 } from "lucide-react";
 
 import { prisma } from "@/lib/prisma";
@@ -358,8 +359,11 @@ Back to Admin </Link>
             const paymentIcon =
               funding.paymentMethod === "CRYPTO"
                 ? Bitcoin
-                : CreditCard;
-
+                : funding.paymentMethod === "GCASH" ||
+                    funding.paymentMethod === "MAYA" ||
+                    funding.paymentMethod === "TOUCH_N_GO"
+                  ? Wallet
+                  : CreditCard;
             const PaymentIcon =
               paymentIcon;
 
@@ -377,7 +381,17 @@ Back to Admin </Link>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
-                          {funding.paymentMethod}
+                          {funding.paymentMethod === "GCASH"
+                            ? "GCash"
+                            : funding.paymentMethod === "MAYA"
+                              ? "Maya"
+                              : funding.paymentMethod === "TOUCH_N_GO"
+                                ? "Touch ’n Go"
+                                : funding.paymentMethod === "SPECIAL_CARD"
+                                  ? "Special Card"
+                                  : funding.paymentMethod === "CRYPTO"
+                                    ? "Crypto"
+                                    : "Credit / debit card"}
                         </span>
 
                         <span

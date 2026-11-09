@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 
 import {
   SupportConversationStatus,
-} from "@/generated/prisma/client";
+} from "@/generated/prisma";
 
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";

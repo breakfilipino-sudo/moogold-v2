@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -111,6 +111,67 @@ export default function CryptoWithdrawalForm({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  const errorMessageRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (
+      error !==
+      "The destination wallet address is not valid for the selected cryptocurrency and network."
+    ) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      const element = errorMessageRef.current;
+
+      if (!element) return;
+
+      let parent = element.parentElement;
+      let scrollContainer: HTMLElement | null = null;
+
+      while (parent && parent !== document.body) {
+        const style = window.getComputedStyle(parent);
+
+        if (
+          /(auto|scroll|overlay)/.test(style.overflowY) &&
+          parent.scrollHeight > parent.clientHeight
+        ) {
+          scrollContainer = parent;
+          break;
+        }
+
+        parent = parent.parentElement;
+      }
+
+      if (scrollContainer) {
+        const elementRect = element.getBoundingClientRect();
+        const containerRect = scrollContainer.getBoundingClientRect();
+
+        scrollContainer.scrollTo({
+          top:
+            scrollContainer.scrollTop +
+            elementRect.top -
+            containerRect.top -
+            scrollContainer.clientHeight / 2 +
+            elementRect.height / 2,
+          behavior: "smooth",
+        });
+      } else {
+        const elementRect = element.getBoundingClientRect();
+
+        window.scrollTo({
+          top:
+            window.scrollY +
+            elementRect.top -
+            window.innerHeight / 2 +
+            elementRect.height / 2,
+          behavior: "smooth",
+        });
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [error]);
 
   const selectedBalance = useMemo(
     () => balances.find((balance) => balance.asset === asset) ?? null,
@@ -251,7 +312,7 @@ export default function CryptoWithdrawalForm({
 
         <form onSubmit={handleSubmit} className="space-y-5 px-4 py-4 sm:px-5">
           {error && (
-            <div className="flex gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-sm leading-5 text-red-700">
+            <div ref={errorMessageRef} role="alert" className="flex gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-sm leading-5 text-red-700">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
               <span>{error}</span>
             </div>

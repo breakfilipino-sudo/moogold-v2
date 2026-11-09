@@ -13,6 +13,7 @@ import {
 import { getCurrentUser } from "@/lib/auth/current-user";
 
 import NotificationsList from "./notifications-list";
+import PushSettings from "./push-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +101,8 @@ export default async function NotificationsPage() {
             </div>
           </div>
         </div>
+
+        <PushSettings />
 
         <NotificationsList
           initialNotifications={notificationData}

@@ -207,9 +207,6 @@ export default function WithdrawForm({
                 Withdrawal amount
               </h2>
             </div>
-            <span className="text-xs font-medium text-slate-400">
-              No minimum withdrawal amount
-            </span>
           </div>
 
           <p className="mb-4 text-sm text-slate-500">

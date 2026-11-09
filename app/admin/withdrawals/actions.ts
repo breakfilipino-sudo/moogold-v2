@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
+import { formatUsdNotificationAmount } from "@/lib/notification-currency";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -83,6 +84,26 @@ export async function approveWithdrawal(
     formData,
     "reference",
   );
+
+  const withdrawalForNotification = await prisma.transaction.findUnique({
+    where: { reference },
+    select: {
+      amount: true,
+      usdAmount: true,
+      withdrawalDetails: { select: { notes: true } },
+      user: { select: { countryCode: true } },
+    },
+  });
+
+  const approvalLocalAmount =
+    withdrawalForNotification?.withdrawalDetails?.notes === "REGULAR_LOAN_CASHOUT"
+      ? null
+      : withdrawalForNotification
+        ? await formatUsdNotificationAmount(
+            Number(withdrawalForNotification.usdAmount ?? withdrawalForNotification.amount),
+            withdrawalForNotification.user.countryCode,
+          )
+        : null;
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -164,10 +185,9 @@ export async function approveWithdrawal(
             : "Withdrawal approved",
           message: isLoanCashout
             ? `Your Loan Balance cash-out of ${transaction.currency} ${transaction.amount.toFixed(2)} has been approved.`
-            : `Your withdrawal of $${(
-                transaction.usdAmount ??
-                transaction.amount
-              ).toFixed(2)} has been approved.`,
+            : approvalLocalAmount
+              ? `Your withdrawal of ${approvalLocalAmount} has been approved.`
+              : "Your withdrawal has been approved.",
           href: isLoanCashout
             ? "/dashboard/loan"
             : "/dashboard/withdraw",
@@ -236,6 +256,26 @@ export async function rejectWithdrawal(
       "Rejection reason cannot exceed 500 characters.",
     );
   }
+
+  const withdrawalForNotification = await prisma.transaction.findUnique({
+    where: { reference },
+    select: {
+      amount: true,
+      usdAmount: true,
+      withdrawalDetails: { select: { notes: true } },
+      user: { select: { countryCode: true } },
+    },
+  });
+
+  const rejectionLocalAmount =
+    withdrawalForNotification?.withdrawalDetails?.notes === "REGULAR_LOAN_CASHOUT"
+      ? null
+      : withdrawalForNotification
+        ? await formatUsdNotificationAmount(
+            Number(withdrawalForNotification.usdAmount ?? withdrawalForNotification.amount),
+            withdrawalForNotification.user.countryCode,
+          )
+        : null;
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -492,15 +532,17 @@ export async function rejectWithdrawal(
           userId: transaction.userId,
           type: "WITHDRAWAL",
           title: "Withdrawal rejected",
-          message:
-  `Your withdrawal of $${(
-    transaction.usdAmount ??
-    transaction.amount
-  ).toFixed(2)} was rejected and the funds were returned to your ${
-    balanceType === "CASH"
-      ? "cash"
-      : "referral"
-  } balance. Reason: ${rejectionReason}`,
+          message: rejectionLocalAmount
+            ? `Your withdrawal of ${rejectionLocalAmount} was rejected and the funds were returned to your ${
+                balanceType === "CASH"
+                  ? "cash"
+                  : "referral"
+              } balance. Reason: ${rejectionReason}`
+            : `Your withdrawal was rejected and the funds were returned to your ${
+                balanceType === "CASH"
+                  ? "cash"
+                  : "referral"
+              } balance. Reason: ${rejectionReason}`,
           href: "/dashboard/withdraw",
         },
       });

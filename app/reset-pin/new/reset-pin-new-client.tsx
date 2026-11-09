@@ -299,17 +299,17 @@ export default function ResetPinNewClient() {
           <KeyRound className="h-6 w-6 text-emerald-400" />
         </div>
 
-        {/* Verified phone */}
+        {/* Verified account */}
         <div className="flex items-center gap-3 rounded-2xl border border-emerald-400/10 bg-emerald-400/[.04] p-4">
           <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-400" />
 
           <div className="min-w-0">
             <p className="text-xs font-black uppercase tracking-widest text-emerald-400">
-              Number verified
+              Email verified
             </p>
 
             <p className="mt-1 truncate text-sm font-bold text-white/65">
-              {phone}
+              Account mobile number: {phone}
             </p>
           </div>
         </div>

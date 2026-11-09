@@ -1,6 +1,6 @@
-﻿import { randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
-import type { CryptoAssetCode } from "@/lib/crypto/prices";
+import type { DepositCryptoAssetCode } from "@/lib/crypto/prices";
 import type { VerifiedRate } from "./verified-prices";
 
 const QUOTE_LIFETIME_MS = 60_000;
@@ -29,7 +29,7 @@ const CURRENCY_MINOR_UNITS: Readonly<Record<string, number>> = {
 };
 
 export type ConversionQuoteInput = {
-  asset: CryptoAssetCode;
+  asset: DepositCryptoAssetCode;
   cryptoAmount: string;
   cryptoUsdPrice: VerifiedRate;
   usdToLocalRate: VerifiedRate;
@@ -40,7 +40,7 @@ export type ConversionQuoteInput = {
 
 export type ConversionQuote = {
   quoteId: string;
-  asset: CryptoAssetCode;
+  asset: DepositCryptoAssetCode;
   cryptoAmount: string;
   cryptoUsdPrice: string;
   cryptoPriceSource: string;

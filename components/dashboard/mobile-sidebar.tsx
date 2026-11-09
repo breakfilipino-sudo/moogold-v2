@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import Image from "next/image";
 
 import Link from "next/link";
@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Loader2,
   BriefcaseBusiness,
+  MessageCircle
 } from "lucide-react";
 import { useState } from "react";
 
@@ -33,6 +34,7 @@ const items = [
 ] as const;
 
 const secondaryItems = [
+  ["customerService", "/dashboard/support", MessageCircle],
   ["settings", "/dashboard/settings", Settings],
 ] as const;
 

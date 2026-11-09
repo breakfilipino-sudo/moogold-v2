@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma";
 import { getCryptoUsdPrices } from "@/lib/crypto/prices";
 import { createClient } from "@/lib/supabase/server";
 

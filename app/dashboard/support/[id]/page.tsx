@@ -8,7 +8,7 @@ import { notFound, redirect } from "next/navigation";
 import {
   SupportConversationStatus,
   SupportSenderType,
-} from "@/generated/prisma/client";
+} from "@/generated/prisma";
 
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
@@ -332,7 +332,7 @@ export default async function SupportConversationPage({
                                 {isCustomer
                                   ? "You"
                                   : "Customer Service"}{" "}
-                                •{" "}
+                                â€¢{" "}
                                 {formatMessageTime(
                                   message.createdAt,
                                 )}

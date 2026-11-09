@@ -12,55 +12,76 @@ ShieldCheck,
 import { submitCryptoDeposit } from "@/app/dashboard/crypto/actions";
 
 const CRYPTO_OPTIONS = [
-{
-asset: "USDC",
-network: "Ethereum (ERC-20)",
-networkKey: "ETHEREUM",
-address: "0x12C844aeA5FFe9271fb6f2F1e1fd1811512B4ad1",
-},
-{
-asset: "USDT",
-network: "Tron (TRC-20)",
-networkKey: "TRON",
-address: "TKrbT8qikYzZd8tBwPQ2teaLZCV4aJ5NKg",
-},
-{
-asset: "BTC",
-network: "Bitcoin",
-networkKey: "BITCOIN",
-address: "33a54tDd51n13TMYi6KqZ3WUdo2LpQcnqC",
-},
-{
-asset: "ETH",
-network: "Ethereum (ERC-20)",
-networkKey: "ETHEREUM",
-address: "0xae70A129dfd37186C70697494B08c4151C408717",
-},
-{
-asset: "SOL",
-network: "Solana",
-networkKey: "SOLANA",
-address: "GFenbSRhcZwPg7KE85AJS4AB7khUeVdBkUSQjuJj2xDj",
-},
-{
-asset: "TRN",
-network: "Tron",
-networkKey: "TRON",
-address: "TLGGvkFbJWtT3jvxx8uss14Mshmrz7Kenx",
-},
-{
-asset: "XLM",
-network: "Stellar",
-networkKey: "STELLAR",
-address:
-"GD5LP2XKZV2QJBY3VIJTTC6ECN3LGJQMCJXSAYPPXZHWGVTJOQM5H3MP",
-},
+  {
+    asset: "USDT",
+    network: "Tron (TRC20)",
+    networkKey: "TRON",
+    address: "TJKxnXkwhH8fC9qY9g8YXvCoHSqyZ1oR12",
+    memo: undefined,
+  },
+  {
+    asset: "USDC",
+    network: "Ethereum (ERC20)",
+    networkKey: "ETHEREUM",
+    address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+    memo: undefined,
+  },
+  {
+    asset: "BTC",
+    network: "Bitcoin",
+    networkKey: "BITCOIN",
+    address: "16GZmP9ybu1m1wYvzG5D4Q6aCrxn3ebYgU",
+    memo: undefined,
+  },
+  {
+    asset: "BNB",
+    network: "BNB Smart Chain (BEP20)",
+    networkKey: "BNB_SMART_CHAIN",
+    address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+    memo: undefined,
+  },
+  {
+    asset: "ETH",
+    network: "Ethereum (ERC20)",
+    networkKey: "ETHEREUM",
+    address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+    memo: undefined,
+  },
+  {
+    asset: "SOL",
+    network: "Solana",
+    networkKey: "SOLANA",
+    address: "orwuXMAC81ivmAKR5X4oB4hpvRzmfE7jSUXdrjQYgkv",
+    memo: undefined,
+  },
+  {
+    asset: "XLM",
+    network: "Stellar",
+    networkKey: "STELLAR",
+    address: "GABFQIK63R2NETJM7T673EAMZN4RJLLGP3OFUEJU5SZVTGWUKULZJNL6",
+    memo: "401607474",
+  },
+  {
+    asset: "TRX",
+    network: "Tron (TRC20)",
+    networkKey: "TRON",
+    address: "TJKxnXkwhH8fC9qY9g8YXvCoHSqyZ1oR12",
+    memo: undefined,
+  },
+  {
+    asset: "SUI",
+    network: "Sui",
+    networkKey: "SUI",
+    address: "0xfe65cba4a2b4f67b13e68c548460d129fa0b0b9cae6f6e2d5d8ce0adaa94c8ab",
+    memo: undefined,
+  },
 ] as const;
 
 export default function CryptoDepositForm() {
 const [selectedAsset, setSelectedAsset] = useState("USDT");
 const [amount, setAmount] = useState("");
 const [copied, setCopied] = useState(false);
+const [memoCopied, setMemoCopied] = useState(false);
 const [submitted, setSubmitted] = useState(false);
 const [loading, setLoading] = useState(false);
 const [error, setError] = useState("");
@@ -90,6 +111,20 @@ await navigator.clipboard.writeText(selected.address);
 
 }
 
+async function copyMemo() {
+  if (!selected.memo) return;
+
+  try {
+    await navigator.clipboard.writeText(selected.memo);
+    setMemoCopied(true);
+
+    window.setTimeout(() => {
+      setMemoCopied(false);
+    }, 2000);
+  } catch {
+    setError("Unable to copy the Stellar memo. Please copy it manually.");
+  }
+}
 async function handleSubmit(
 event: React.FormEvent<HTMLFormElement>,
 ) {
@@ -116,6 +151,7 @@ try {
 
   formData.set("asset", selected.asset);
   formData.set("amount", trimmedAmount);
+  formData.set("memo", selected.memo ?? "");
 
   const result = await submitCryptoDeposit(formData);
 
@@ -357,6 +393,39 @@ Send cryptocurrency </h2>
         </button>
       </div>
     </div>
+
+    {selected.memo && (
+      <div className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4">
+        <p className="text-sm font-black text-amber-950">
+          Stellar memo — required
+        </p>
+        <p className="mt-1 text-xs leading-5 text-amber-800">
+          Include this memo when sending XLM. Omitting it may result in lost funds.
+        </p>
+        <div className="mt-3 flex flex-col gap-3 rounded-xl border border-amber-200 bg-white p-3 sm:flex-row sm:items-center">
+          <code className="min-w-0 flex-1 break-all text-sm font-bold text-slate-900">
+            {selected.memo}
+          </code>
+          <button
+            type="button"
+            onClick={copyMemo}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white"
+          >
+            {memoCopied ? (
+              <>
+                <Check className="h-4 w-4" />
+                Copied
+              </>
+            ) : (
+              <>
+                <Copy className="h-4 w-4" />
+                Copy Memo
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    )}
 
     {error && (
       <div

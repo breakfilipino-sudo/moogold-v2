@@ -11,6 +11,18 @@ import { createClient } from "@/lib/supabase/server";
 
 const MAXIMUM_DEPOSIT_USD = 100_000;
 
+type EwalletMethod = "GCASH" | "MAYA" | "TOUCH_N_GO";
+type DepositMethod = "CARD" | EwalletMethod;
+
+const EWALLET_METHODS: Record<
+  EwalletMethod,
+  { bankName: string; countryCode: string }
+> = {
+  GCASH: { bankName: "GCash", countryCode: "PH" },
+  MAYA: { bankName: "Maya", countryCode: "PH" },
+  TOUCH_N_GO: { bankName: "Touch 'n Go", countryCode: "MY" },
+};
+
 async function requireUser() {
   const supabase = await createClient();
 
@@ -18,86 +30,45 @@ async function requireUser() {
     data: { user: authUser },
   } = await supabase.auth.getUser();
 
-  if (!authUser) {
-    redirect("/login");
-  }
+  if (!authUser) redirect("/login");
 
   const user = await prisma.user.findUnique({
-    where: {
-      authUserId: authUser.id,
-    },
+    where: { authUserId: authUser.id },
   });
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) redirect("/login");
 
   return user;
 }
 
-function getRequiredValue(
-  formData: FormData,
-  name: string,
-): string {
-  const value = String(
-    formData.get(name) ?? "",
-  ).trim();
+function getRequiredValue(formData: FormData, name: string): string {
+  const value = String(formData.get(name) ?? "").trim();
 
   if (!value) {
-    throw new Error(
-      `${name} is required.`,
-    );
+    throw new Error(`${name} is required.`);
   }
 
   return value;
 }
 
-function getOptionalValue(
-  formData: FormData,
-  name: string,
-): string | null {
-  const value = String(
-    formData.get(name) ?? "",
-  ).trim();
-
+function getOptionalValue(formData: FormData, name: string): string | null {
+  const value = String(formData.get(name) ?? "").trim();
   return value || null;
 }
 
 function generateDepositReference() {
   const timestamp = Date.now();
-
-  const random = Math.random()
-    .toString(36)
-    .slice(2, 8)
-    .toUpperCase();
+  const random = Math.random().toString(36).slice(2, 8).toUpperCase();
 
   return `MG-DP-${timestamp}-${random}`;
 }
 
-/*
- * Returns:
- * 1 unit of local currency = X USD
- *
- * Example:
- * 1 MYR = 0.23 USD
- *
- * The server obtains the rate itself.
- * The browser never controls the final USD value.
- */
-async function getUsdExchangeRate(
-  currency: string,
-): Promise<number> {
-  if (currency === "USD") {
-    return 1;
-  }
+async function getUsdExchangeRate(currency: string): Promise<number> {
+  if (currency === "USD") return 1;
 
   const response = await fetch(
-    `https://api.frankfurter.dev/v2/rate/${encodeURIComponent(
-      currency,
-    )}/USD`,
-    {
-      cache: "no-store",
-    },
+    `https://api.frankfurter.dev/v2/rate/${encodeURIComponent(currency)}/USD`,
+    { cache: "no-store" },
   );
 
   if (!response.ok) {
@@ -106,18 +77,10 @@ async function getUsdExchangeRate(
     );
   }
 
-  const data = (await response.json()) as {
-    rate?: number;
-  };
+  const data = (await response.json()) as { rate?: number };
+  const rate = Number(data?.rate);
 
-  const rate = Number(
-    data?.rate,
-  );
-
-  if (
-    !Number.isFinite(rate) ||
-    rate <= 0
-  ) {
+  if (!Number.isFinite(rate) || rate <= 0) {
     throw new Error(
       "The current exchange rate could not be determined. Please try again.",
     );
@@ -126,25 +89,12 @@ async function getUsdExchangeRate(
   return rate;
 }
 
-export async function requestDeposit(
-  formData: FormData,
-): Promise<void> {
+export async function requestDeposit(formData: FormData): Promise<void> {
   const user = await requireUser();
 
-  /*
-   * Country and currency are always taken from
-   * the authenticated user's database record.
-   *
-   * The hidden countryCode field submitted by the
-   * browser is intentionally not trusted.
-   */
-  const countryCode =
-    user.countryCode?.toUpperCase() ?? "";
-
-  const country =
-    getCountryFinancialConfig(
-      countryCode,
-    );
+  // The authenticated user's registered country is authoritative.
+  const countryCode = user.countryCode?.toUpperCase() ?? "";
+  const country = getCountryFinancialConfig(countryCode);
 
   if (!country) {
     throw new Error(
@@ -152,10 +102,8 @@ export async function requestDeposit(
     );
   }
 
-  const currency =
-    country.currency;
-  const minimumTopUp =
-    getMinimumTopUpAmount(countryCode);
+  const currency = country.currency;
+  const minimumTopUp = getMinimumTopUpAmount(countryCode);
 
   if (minimumTopUp === null) {
     throw new Error(
@@ -163,91 +111,72 @@ export async function requestDeposit(
     );
   }
 
-  const amountText =
-    getRequiredValue(
-      formData,
-      "amount",
-    );
+  const amountText = getRequiredValue(formData, "amount");
 
-  if (
-    !/^\d+(\.\d{1,2})?$/.test(
-      amountText,
-    )
-  ) {
+  if (!/^\d+(\.\d{1,2})?$/.test(amountText)) {
     throw new Error(
       "Add Fund amounts can have a maximum of 2 decimal places.",
     );
   }
 
-  const amount =
-    Number(amountText);
+  const amount = Number(amountText);
 
-  if (
-    !Number.isFinite(amount) ||
-    amount <= 0
-  ) {
-    throw new Error(
-      "Please enter a valid add-fund amount.",
-    );
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Please enter a valid add-fund amount.");
   }
 
-  const bankName =
-    getRequiredValue(
-      formData,
-      "bankName",
-    );
+  const submittedMethod = getRequiredValue(formData, "method");
+  let method: DepositMethod;
+  let bankName: string;
+  let isEwallet = false;
 
-  if (
-    bankName !==
-    "Credit / Debit Card"
+  if (submittedMethod === "CARD") {
+    // Preserve the existing Card payment method and destination.
+    method = "CARD";
+    bankName = "Credit / Debit Card";
+  } else if (
+    Object.prototype.hasOwnProperty.call(
+      EWALLET_METHODS,
+      submittedMethod,
+    )
   ) {
-    throw new Error(
-      "Please select a valid payment method.",
-    );
+    const ewalletMethod = submittedMethod as EwalletMethod;
+    const config = EWALLET_METHODS[ewalletMethod];
+
+    if (countryCode !== config.countryCode) {
+      throw new Error(
+        "This payment method is not available for your registered country.",
+      );
+    }
+
+    method = ewalletMethod;
+    bankName = config.bankName;
+    isEwallet = true;
+  } else {
+    throw new Error("Please select a valid payment method.");
   }
 
-  const externalReference =
-    getOptionalValue(
-      formData,
-      "externalReference",
-    );
+  const externalReference = getOptionalValue(
+    formData,
+    "externalReference",
+  );
 
-  if (
-    externalReference &&
-    externalReference.length > 100
-  ) {
-    throw new Error(
-      "Payment reference is too long.",
-    );
+  if (externalReference && externalReference.length > 100) {
+    throw new Error("Payment reference is too long.");
   }
 
-  const notes =
-    getOptionalValue(
-      formData,
-      "notes",
-    );
+  const notes = getOptionalValue(formData, "notes");
 
-  if (
-    notes &&
-    notes.length > 500
-  ) {
-    throw new Error(
-      "Notes are too long.",
-    );
+  if (notes && notes.length > 500) {
+    throw new Error("Notes are too long.");
   }
 
   let exchangeRate: number;
 
   try {
-    exchangeRate =
-      await getUsdExchangeRate(
-        currency,
-      );
+    exchangeRate = await getUsdExchangeRate(currency);
   } catch (error) {
-    console.error(
-      "Failed to retrieve add-fund exchange rate:",
-      error,
-    );
+    console.error("Failed to retrieve add-fund exchange rate:", error);
 
     throw new Error(
       error instanceof Error
@@ -256,16 +185,10 @@ export async function requestDeposit(
     );
   }
 
-  const usdAmount =
-    amount * exchangeRate;
+  const usdAmount = amount * exchangeRate;
 
-  if (
-    !Number.isFinite(usdAmount) ||
-    usdAmount <= 0
-  ) {
-    throw new Error(
-      "Unable to calculate the add-fund value.",
-    );
+  if (!Number.isFinite(usdAmount) || usdAmount <= 0) {
+    throw new Error("Unable to calculate the add-fund value.");
   }
 
   if (amount < minimumTopUp) {
@@ -274,83 +197,63 @@ export async function requestDeposit(
     );
   }
 
-  if (
-    usdAmount >
-    MAXIMUM_DEPOSIT_USD
-  ) {
+  if (usdAmount > MAXIMUM_DEPOSIT_USD) {
     throw new Error(
       "Max exceeded. The maximum add-fund amount is $100,000 USD equivalent.",
     );
   }
 
   const accountName =
-    user.fullName ||
-    user.email?.split("@")[0] ||
-    "MooGold User";
+    user.fullName || user.email?.split("@")[0] || "MooGold User";
 
-  const depositReference =
-    generateDepositReference();
+  const depositReference = generateDepositReference();
+
+  let createdTransactionId = "";
 
   try {
-    await prisma.$transaction(
-      async (tx) => {
-        const wallet =
-          await tx.wallet.findUnique({
-            where: {
-              userId: user.id,
-            },
-            select: {
-              id: true,
-            },
-          });
+    await prisma.$transaction(async (tx) => {
+      const wallet = await tx.wallet.findUnique({
+        where: { userId: user.id },
+        select: { id: true },
+      });
 
-        if (!wallet) {
-          throw new Error(
-            "Your wallet could not be found.",
-          );
-        }
+      if (!wallet) {
+        throw new Error("Your wallet could not be found.");
+      }
 
-        const transaction =
-          await tx.transaction.create({
-            data: {
-              userId: user.id,
-              type: "DEPOSIT",
-              status: "PENDING",
-              balanceType: "CASH",
-              amount,
-              currency,
-              usdAmount,
-              exchangeRate,
-              description:
-                `Deposit request via ${bankName}.`,
-              reference:
-                depositReference,
-            },
-          });
+      const transaction = await tx.transaction.create({
+        data: {
+          userId: user.id,
+          type: "DEPOSIT",
+          status: "PENDING",
+          balanceType: "CASH",
+          amount,
+          currency,
+          usdAmount,
+          exchangeRate,
+          description: `Deposit request via ${bankName}.`,
+          reference: depositReference,
+        },
+      });
+      createdTransactionId = transaction.id;
 
-        await tx.depositDetails.create({
-          data: {
-            id: transaction.id,
-            transactionId:
-              transaction.id,
-            method: "CARD",
-            countryCode,
-            bankName,
-            senderName:
-              accountName,
-            senderAccount:
-              null,
-            externalReference,
-            notes,
-          },
-        });
-      },
-    );
+      await tx.depositDetails.create({
+        data: {
+          id: transaction.id,
+          transactionId: transaction.id,
+          method,
+          countryCode,
+          bankName,
+          senderName: accountName,
+          senderAccount: null,
+          externalReference,
+          notes,
+          gatewayUrl: null,
+        },
+      });
+    });
   } catch (error) {
-    console.error(
-      "Failed to create add-fund request:",
-      error,
-    );
+    console.error("Failed to create add-fund request:", error);
 
     throw new Error(
       error instanceof Error
@@ -359,25 +262,53 @@ export async function requestDeposit(
     );
   }
 
-  void sendAdminEmailAlert({
-    subject: "Deposit request awaiting review",
-    message:
-      `A new deposit request is awaiting admin review.\n` +
-      `Reference: ${depositReference}\n` +
-      `Amount: ${amount} ${currency}\n` +
-      `USD equivalent: $${usdAmount}\n` +
-      `Status: PENDING`,
-  });
+  if (isEwallet) {
+    await sendAdminEmailAlert({
+      subject: `${bankName} deposit request awaiting gateway`,
+      message:
+        `A new e-wallet deposit request is awaiting admin attention.\n\n` +
+        `Payment method: ${bankName}\n` +
+        `Reference: ${depositReference}\n` +
+        `Customer: ${accountName}\n` +
+        `Email: ${user.email ?? "Not available"}\n` +
+        `Phone: ${user.phone ?? "Not available"}\n` +
+        `Amount: ${amount} ${currency}\n` +
+        `USD equivalent: $${usdAmount.toFixed(2)}\n` +
+        `Status: PENDING\n\n` +
+        `Please open E-wallet Deposits in the admin dashboard to manage the gateway URL.`,
+    });
+  } else {
+    // Keep the existing Card alert behavior.
+    void sendAdminEmailAlert({
+      subject: "Deposit request awaiting review",
+      message:
+        `A new deposit request is awaiting admin review.\n` +
+        `Reference: ${depositReference}\n` +
+        `Amount: ${amount} ${currency}\n` +
+        `USD equivalent: $${usdAmount}\n` +
+        `Status: PENDING`,
+    });
+  }
+
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/wallet");
   revalidatePath("/dashboard/deposit");
   revalidatePath("/dashboard/transactions");
   revalidatePath("/admin/deposits");
   revalidatePath("/admin/transactions");
+  revalidatePath("/admin/e-wallet-deposits");
 
+  if (isEwallet) {
+    if (method === "MAYA") {
+      redirect(`/dashboard/deposit/maya?transactionId=${encodeURIComponent(createdTransactionId)}`);
+    }
+    redirect(
+      `/dashboard/deposit-request/${encodeURIComponent(depositReference)}`,
+    );
+  }
+
+  // Existing Card route remains unchanged.
   redirect(
-    `/dashboard/deposit/${encodeURIComponent(
-      depositReference,
-    )}`,
+    `/dashboard/deposit/${encodeURIComponent(depositReference)}`,
   );
 }

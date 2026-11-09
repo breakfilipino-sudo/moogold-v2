@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MooGold â€” Wealth Dashboard",
+  title: "MooGold",
   description:
     "Your financial world for money, gold, crypto, gift cards and rewards.",
   manifest: "/manifest.webmanifest",
@@ -27,7 +27,6 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "MooGold",
     statusBarStyle: "default",
   },
 };
@@ -47,11 +46,12 @@ export default function RootLayout({
   children,
 }: RootLayoutProps) {
   return (
-    <html suppressHydrationWarning
+    <html
+      suppressHydrationWarning
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full">
+      <head>
         <Script
           id="moogold-theme-init"
           strategy="beforeInteractive"
@@ -59,6 +59,8 @@ export default function RootLayout({
             __html: `(function(){try{var saved=localStorage.getItem("moogold-theme");var theme=(saved==="light"||saved==="dark"||saved==="system")?saved:"system";var dark=theme==="dark"||(theme==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);var root=document.documentElement;root.classList.toggle("dark",dark);root.style.colorScheme=dark?"dark":"light";}catch(e){}})();`,
           }}
         />
+      </head>
+      <body className="min-h-full">
         <PwaRegister />
         {children}
       </body>

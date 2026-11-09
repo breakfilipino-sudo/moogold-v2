@@ -1,7 +1,7 @@
 "use server";
 
 import { sendAdminEmailAlert } from "@/lib/admin-email-alerts";
-import { Prisma } from "../../../generated/prisma/client";
+import { Prisma } from "../../../generated/prisma";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 import { validateCryptoWithdrawalAddress } from "@/lib/crypto/address-validation";
@@ -24,49 +24,107 @@ function isTransactionConflict(error: unknown): boolean {
     error.code === "P2034"
   );
 }
-const CRYPTO_OPTIONS = {
+const WITHDRAWAL_CRYPTO_OPTIONS = {
   USDC: {
     network: "ETHEREUM" as const,
     networkLabel: "Ethereum (ERC-20)",
   },
-
   USDT: {
     network: "TRON" as const,
     networkLabel: "Tron (TRC-20)",
   },
-
   BTC: {
     network: "BITCOIN" as const,
     networkLabel: "Bitcoin",
   },
-
   ETH: {
     network: "ETHEREUM" as const,
     networkLabel: "Ethereum (ERC-20)",
   },
-
   SOL: {
     network: "SOLANA" as const,
     networkLabel: "Solana",
   },
-
   TRN: {
     network: "TRON" as const,
     networkLabel: "Tron",
   },
-
   XLM: {
     network: "STELLAR" as const,
     networkLabel: "Stellar",
   },
 } as const;
 
-type CryptoAsset = keyof typeof CRYPTO_OPTIONS;
+type CryptoAsset = keyof typeof WITHDRAWAL_CRYPTO_OPTIONS;
 
 function isSupportedAsset(value: string): value is CryptoAsset {
-  return Object.prototype.hasOwnProperty.call(CRYPTO_OPTIONS, value);
+  return Object.prototype.hasOwnProperty.call(
+    WITHDRAWAL_CRYPTO_OPTIONS,
+    value,
+  );
 }
 
+const STELLAR_DEPOSIT_MEMO = "401607474";
+
+const DEPOSIT_CRYPTO_OPTIONS = {
+  BTC: {
+    network: "BITCOIN" as const,
+    networkLabel: "Bitcoin",
+    address: "16GZmP9ybu1m1wYvzG5D4Q6aCrxn3ebYgU",
+  },
+  USDT: {
+    network: "TRON" as const,
+    networkLabel: "Tron (TRC-20)",
+    address: "TJKxnXkwhH8fC9qY9g8YXvCoHSqyZ1oR12",
+  },
+  BNB: {
+    network: "BNB_SMART_CHAIN" as const,
+    networkLabel: "BNB Smart Chain (BEP-20)",
+    address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+  },
+  ETH: {
+    network: "ETHEREUM" as const,
+    networkLabel: "Ethereum (ERC-20)",
+    address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+  },
+  USDC: {
+    network: "ETHEREUM" as const,
+    networkLabel: "Ethereum (ERC-20)",
+    address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+  },
+  SOL: {
+    network: "SOLANA" as const,
+    networkLabel: "Solana",
+    address: "orwuXMAC81ivmAKR5X4oB4hpvRzmfE7jSUXdrjQYgkv",
+  },
+  XLM: {
+    network: "STELLAR" as const,
+    networkLabel: "Stellar",
+    address: "GABFQIK63R2NETJM7T673EAMZN4RJLLGP3OFUEJU5SZVTGWUKULZJNL6",
+    memo: STELLAR_DEPOSIT_MEMO,
+  },
+  TRX: {
+    network: "TRON" as const,
+    networkLabel: "Tron (TRC-20)",
+    address: "TJKxnXkwhH8fC9qY9g8YXvCoHSqyZ1oR12",
+  },
+  SUI: {
+    network: "SUI" as const,
+    networkLabel: "Sui",
+    address: "0xfe65cba4a2b4f67b13e68c548460d129fa0b0b9cae6f6e2d5d8ce0adaa94c8ab",
+  },
+} as const;
+
+type DepositCryptoAsset = keyof typeof DEPOSIT_CRYPTO_OPTIONS;
+
+function isSupportedDepositAsset(
+  value: string,
+): value is DepositCryptoAsset {
+  return Object.prototype.hasOwnProperty.call(
+    DEPOSIT_CRYPTO_OPTIONS,
+    value,
+  );
+}
 /*
  * ============================================================
  * CRYPTO WITHDRAWAL FEE
@@ -155,7 +213,7 @@ export async function submitCryptoDeposit(formData: FormData) {
     .trim()
     .toUpperCase();
 
-  if (!isSupportedAsset(assetInput)) {
+  if (!isSupportedDepositAsset(assetInput)) {
     return {
       success: false,
       error: "Please select a supported cryptocurrency.",
@@ -180,7 +238,23 @@ export async function submitCryptoDeposit(formData: FormData) {
     };
   }
 
-  const cryptoOption = CRYPTO_OPTIONS[assetInput];
+  const cryptoOption = DEPOSIT_CRYPTO_OPTIONS[assetInput];
+  const submittedMemo = String(formData.get("memo") ?? "").trim();
+  const expectedMemo = "memo" in cryptoOption ? cryptoOption.memo : null;
+
+  if (expectedMemo && submittedMemo !== expectedMemo) {
+    return {
+      success: false,
+      error: "Enter the exact Stellar memo shown above before submitting.",
+    };
+  }
+
+  if (!expectedMemo && submittedMemo) {
+    return {
+      success: false,
+      error: "A memo is not required for the selected cryptocurrency.",
+    };
+  }
 
   /*
    * MooGold uses the existing shared receiving wallet
@@ -193,15 +267,6 @@ export async function submitCryptoDeposit(formData: FormData) {
    * the admin/blockchain verification process.
    */
 
-  const receivingAddresses = {
-    USDC: "0x12C844aeA5FFe9271fb6f2F1e1fd1811512B4ad1",
-    USDT: "TKrbT8qikYzZd8tBwPQ2teaLZCV4aJ5NKg",
-    BTC: "33a54tDd51n13TMYi6KqZ3WUdo2LpQcnqC",
-    ETH: "0xae70A129dfd37186C70697494B08c4151C408717",
-    SOL: "GFenbSRhcZwPg7KE85AJS4AB7khUeVdBkUSQjuJj2xDj",
-    TRN: "TLGGvkFbJWtT3jvxx8uss14Mshmrz7Kenx",
-    XLM: "GD5LP2XKZV2QJBY3VIJTTC6ECN3LGJQMCJXSAYPPXZHWGVTJOQM5H3MP",
-  } as const;
 
   try {
     const deposit = await prisma.$transaction(async (tx) => {
@@ -241,7 +306,8 @@ export async function submitCryptoDeposit(formData: FormData) {
            * transaction is identified and verified.
            */
 
-          receivingAddress: receivingAddresses[assetInput],
+          receivingAddress: cryptoOption.address,
+          memo: expectedMemo,
 
           status: "PENDING",
 
@@ -257,6 +323,7 @@ export async function submitCryptoDeposit(formData: FormData) {
           network: true,
           amount: true,
           receivingAddress: true,
+          memo: true,
           status: true,
           createdAt: true,
         },
@@ -286,6 +353,8 @@ export async function submitCryptoDeposit(formData: FormData) {
         amount: deposit.amount?.toString() ?? null,
 
         receivingAddress: deposit.receivingAddress,
+
+        memo: deposit.memo,
 
         status: deposit.status,
 
@@ -318,21 +387,21 @@ export async function submitCryptoDeposit(formData: FormData) {
  * Flow:
  *
  * User requests withdrawal
- *          â†“
+ *          Ã¢â€ â€œ
  * Server validates request
- *          â†“
+ *          Ã¢â€ â€œ
  * Server checks actual balance
- *          â†“
+ *          Ã¢â€ â€œ
  * CryptoWithdrawal = PENDING
- *          â†“
+ *          Ã¢â€ â€œ
  * Admin reviews
- *          â†“
+ *          Ã¢â€ â€œ
  * Admin approves
- *          â†“
+ *          Ã¢â€ â€œ
  * Balance is deducted
- *          â†“
+ *          Ã¢â€ â€œ
  * CryptoLedgerEntry = DEBIT
- *          â†“
+ *          Ã¢â€ â€œ
  * Withdrawal = COMPLETED
  *
  * Rejected withdrawals never affect the balance.
@@ -384,7 +453,7 @@ export async function submitCryptoWithdrawal(formData: FormData) {
     };
   }
 
-  const cryptoOption = CRYPTO_OPTIONS[assetInput];
+  const cryptoOption = WITHDRAWAL_CRYPTO_OPTIONS[assetInput];
 
   /*
    * ----------------------------------------------------------

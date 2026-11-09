@@ -1,10 +1,10 @@
-import type { CryptoAssetCode } from "@/lib/crypto/prices";
+import type { DepositCryptoAssetCode } from "@/lib/crypto/prices";
 
 const CRYPTO_PRICE_MAX_AGE_MS = 10 * 60 * 1000;
 const FX_RATE_MAX_AGE_MS = 4 * 24 * 60 * 60 * 1000;
 const FUTURE_TIMESTAMP_TOLERANCE_MS = 60 * 1000;
 
-const COINGECKO_IDS: Record<CryptoAssetCode, string> = {
+const COINGECKO_IDS: Record<DepositCryptoAssetCode, string> = {
   USDC: "usd-coin",
   USDT: "tether",
   BTC: "bitcoin",
@@ -12,6 +12,9 @@ const COINGECKO_IDS: Record<CryptoAssetCode, string> = {
   SOL: "solana",
   TRN: "tron",
   XLM: "stellar",
+  BNB: "binancecoin",
+  TRX: "tron",
+  SUI: "sui",
 };
 
 const SUPPORTED_FX_CURRENCIES = new Set([
@@ -101,7 +104,7 @@ function parseObservationTime(value: unknown, maxAgeMs: number): Date {
  * This is a reference-price primitive, not an executable exchange quote.
  */
 export async function getVerifiedCryptoUsdPrice(
-  asset: CryptoAssetCode,
+  asset: DepositCryptoAssetCode,
 ): Promise<VerifiedRate> {
   const coinId = COINGECKO_IDS[asset];
 

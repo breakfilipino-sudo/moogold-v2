@@ -6,8 +6,8 @@ import {
   Prisma,
   type CryptoAsset,
   type CryptoNetwork,
-} from "@/generated/prisma/client";
-import type { CryptoAssetCode } from "@/lib/crypto/prices";
+} from "@/generated/prisma";
+import type { DepositCryptoAssetCode } from "@/lib/crypto/prices";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -32,8 +32,10 @@ const SUPPORTED_PAIRS: Record<string, CryptoNetwork> = {
   "BTC:BITCOIN": "BITCOIN",
   "ETH:ETHEREUM": "ETHEREUM",
   "SOL:SOLANA": "SOLANA",
-  "TRN:TRON": "TRON",
   "XLM:STELLAR": "STELLAR",
+  "BNB:BNB_SMART_CHAIN": "BNB_SMART_CHAIN",
+  "TRX:TRON": "TRON",
+  "SUI:SUI": "SUI",
 };
 
 type ConversionResult =
@@ -155,12 +157,12 @@ export async function estimateCryptoCashConversion(
     const { asset } = getAssetPair(assetInput, networkInput);
 
     const [cryptoRate, fxRate] = await Promise.all([
-      getVerifiedCryptoUsdPrice(asset as CryptoAssetCode),
+      getVerifiedCryptoUsdPrice(asset as DepositCryptoAssetCode),
       getVerifiedUsdFxRate(country.currency),
     ]);
 
     const quote = createConversionQuote({
-      asset: asset as CryptoAssetCode,
+      asset: asset as DepositCryptoAssetCode,
       cryptoAmount,
       cryptoUsdPrice: cryptoRate,
       usdToLocalRate: fxRate,
@@ -246,12 +248,12 @@ export async function submitCryptoCashConversion(
     // Never accept price, FX rate, payout currency, or payout amount
     // from the browser. The registered country selects the currency.
     const [cryptoRate, fxRate] = await Promise.all([
-      getVerifiedCryptoUsdPrice(asset as CryptoAssetCode),
+      getVerifiedCryptoUsdPrice(asset as DepositCryptoAssetCode),
       getVerifiedUsdFxRate(country.currency),
     ]);
 
     const quote = createConversionQuote({
-      asset: asset as CryptoAssetCode,
+      asset: asset as DepositCryptoAssetCode,
       cryptoAmount,
       cryptoUsdPrice: cryptoRate,
       usdToLocalRate: fxRate,

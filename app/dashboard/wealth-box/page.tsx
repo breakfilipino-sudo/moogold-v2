@@ -27,13 +27,6 @@ function formatLocalAmount(
   }).format(value);
 }
 
-function formatEarningDate(date: Date) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-  }).format(date);
-}
-
 export default async function WealthBoxPage() {
   const { user } = await getCurrentUser();
 
@@ -117,18 +110,6 @@ export default async function WealthBoxPage() {
               durationDays: true,
             },
           },
-          earnings: {
-            orderBy: {
-              earningDate: "desc",
-            },
-            select: {
-              id: true,
-              earningDate: true,
-              dayNumber: true,
-              localAmount: true,
-              amountUsd: true,
-            },
-          },
         },
       }),
 
@@ -191,23 +172,6 @@ export default async function WealthBoxPage() {
 
   const currentBalance =
     totalInvestedLocal + totalProfitLocal;
-
-  const dailyEarnings = investments
-    .flatMap((investment) =>
-      investment.earnings.map((earning) => ({
-        id: earning.id,
-        date: earning.earningDate,
-        dayNumber: earning.dayNumber,
-        amount:
-          earning.localAmount !== null
-            ? Number(earning.localAmount)
-            : Number(earning.amountUsd),
-      })),
-    )
-    .sort(
-      (a, b) =>
-        b.date.getTime() - a.date.getTime(),
-    );
 
   const activeInvestment = investments[0] ?? null;
 
@@ -329,38 +293,6 @@ export default async function WealthBoxPage() {
         </div>
         </div>
 
-        {/* Earnings breakdown strip inside the hero card if available */}
-        {investments.length > 0 && dailyEarnings.length > 0 ? (
-          <div className="mt-6 border-t border-white/10 pt-5">
-            <div className="flex items-center justify-between text-xs font-semibold text-slate-300 mb-3">
-              <span>Recent Daily Yields</span>
-              <span className="text-emerald-400 font-bold">{dailyEarnings.length} Total Payouts</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-              {dailyEarnings.slice(0, 6).map((earning) => (
-                <div
-                  key={earning.id}
-                  className="flex items-center justify-between rounded-2xl bg-white/[0.06] px-4 py-3 border border-white/5 backdrop-blur-sm transition hover:bg-white/[0.09]"
-                >
-                  <div>
-                    <p className="text-xs font-bold text-white">
-                      {formatEarningDate(earning.date)}
-                    </p>
-                    <p className="text-[10px] font-medium text-emerald-400/80">
-                      Day {earning.dayNumber} earnings
-                    </p>
-                  </div>
-                  <span className="text-xs font-black text-emerald-300 bg-emerald-500/10 px-2.5 py-1 rounded-xl">
-                    +{formatLocalAmount(
-                      earning.amount,
-                      localCurrency,
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
       </section>
 
       {/* Plans Section */}

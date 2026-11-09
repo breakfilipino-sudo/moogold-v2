@@ -1,7 +1,7 @@
 "use server";
 
-import { Prisma, type CryptoAsset, type CryptoNetwork } from "@/generated/prisma/client";
-import type { CryptoAssetCode } from "@/lib/crypto/prices";
+import { Prisma, type CryptoAsset, type CryptoNetwork } from "@/generated/prisma";
+import type { DepositCryptoAssetCode } from "@/lib/crypto/prices";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 import { getVerifiedCryptoUsdPrice } from "@/lib/crypto-finance/verified-prices";
@@ -16,8 +16,10 @@ const SUPPORTED_PAIRS: Record<string, CryptoNetwork> = {
   "BTC:BITCOIN": "BITCOIN",
   "ETH:ETHEREUM": "ETHEREUM",
   "SOL:SOLANA": "SOLANA",
-  "TRN:TRON": "TRON",
   "XLM:STELLAR": "STELLAR",
+  "BNB:BNB_SMART_CHAIN": "BNB_SMART_CHAIN",
+  "TRX:TRON": "TRON",
+  "SUI:SUI": "SUI",
 };
 
 const LOAN_TERMS =
@@ -52,7 +54,7 @@ function parseAsset(value: FormDataEntryValue | null): CryptoAsset {
     `${value}:unused`,
   )) {
     // Asset/network are validated together by getPair below.
-    if (typeof value !== "string" || !["USDC", "USDT", "BTC", "ETH", "SOL", "TRN", "XLM"].includes(value)) {
+    if (typeof value !== "string" || !["USDC", "USDT", "BTC", "ETH", "SOL", "XLM", "BNB", "TRX", "SUI"].includes(value)) {
       throw new Error("Choose a supported crypto asset.");
     }
   }
@@ -119,8 +121,8 @@ export async function originateCryptoLoan(formData: FormData): Promise<ActionRes
     const collateral = getPair(formData.get("collateralAsset"), formData.get("collateralNetwork"));
 
     const [principalRate, collateralRate] = await Promise.all([
-      getVerifiedCryptoUsdPrice(borrowed.asset as CryptoAssetCode),
-      getVerifiedCryptoUsdPrice(collateral.asset as CryptoAssetCode),
+      getVerifiedCryptoUsdPrice(borrowed.asset as DepositCryptoAssetCode),
+      getVerifiedCryptoUsdPrice(collateral.asset as DepositCryptoAssetCode),
     ]);
 
     const principalPrice = new Prisma.Decimal(String(principalRate.rate));

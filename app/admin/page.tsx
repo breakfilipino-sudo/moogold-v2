@@ -10,6 +10,7 @@ import {
   HandCoins,
   Landmark,
   MessageCircle,
+  Megaphone,
   ShieldCheck,
   Users,
   WalletCards,
@@ -135,6 +136,14 @@ export default function AdminPage() {
               description="Review and manage customer deposit requests."
             />
 
+<AdminCard
+  href="/admin/e-wallet-deposits"
+  icon={CreditCard}
+  label="E-wallet Gateway Management"
+  title="E-wallet Deposits"
+  description="Manage GCash, Maya, and Touch 'n Go gateway links."
+/>
+
             <AdminCard
               href="/admin/withdrawals"
               icon={Landmark}
@@ -157,6 +166,13 @@ export default function AdminPage() {
               label="Digital Assets"
               title="Crypto"
               description="Manage crypto balances, deposits, transactions, and withdrawals."
+            />
+            <AdminCard
+              href="/admin/wallet-crypto-deposits"
+              icon={WalletCards}
+              label="Wallet Funding Management"
+              title="Wallet Crypto Deposits"
+              description="Verify blockchain transfers and approve or reject main-wallet crypto funding requests."
             />
             <AdminCard
               href="/admin/loans"
@@ -188,21 +204,19 @@ export default function AdminPage() {
             />
 
             <AdminCard
-              href="/admin/transactions"
+              href="/admin/gold"
               icon={Coins}
               label="Gold Activity"
               title="Gold"
-              description="Gold administration is not available yet."
-              available={false}
+              description="Monitor customer gold holdings, market snapshots, and purchase and sale activity."
             />
 
             <AdminCard
-              href="/admin/transactions"
+              href="/admin/referrals"
               icon={Users}
               label="Referral Activity"
               title="Referrals"
-              description="Referral administration is not available yet."
-              available={false}
+              description="Review referral activity, qualification status, and recorded rewards."
             />
 
             <AdminCard
@@ -243,21 +257,26 @@ export default function AdminPage() {
             />
 
             <AdminCard
-              href="/admin/transactions"
+              href="/admin/wallet"
               icon={WalletCards}
-              label="Wallet Activity"
+              label="Wallet Management"
               title="Wallet"
-              description="Wallet administration is not available yet."
-              available={false}
+              description="View customer balances, wallet activity, and ledger history."
             />
 
             <AdminCard
-              href="/admin/transactions"
+              href="/admin/users"
               icon={Users}
               label="Customer Management"
               title="Users"
-              description="Customer administration is not available yet."
-              available={false}
+              description="View registered customers, account status, wallet balances, and gold holdings."
+            />
+            <AdminCard
+              href="/admin/push-notifications"
+              icon={Megaphone}
+              label="Promotional Messaging"
+              title="Push Notifications"
+              description="Create promotional phone notifications and manage campaign delivery."
             />
           </div>
         </section>

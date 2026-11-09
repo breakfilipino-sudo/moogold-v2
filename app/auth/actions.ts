@@ -1,6 +1,7 @@
 "use server";
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { Resend } from "resend";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
@@ -801,6 +802,41 @@ export async function createPin(
     maxAge: 0,
   });
 
+  // Send the account-creation welcome email. Delivery must not block registration.
+  try {
+    const resendApiKey = process.env.RESEND_API_KEY;
+    const emailFrom = process.env.ADMIN_NOTIFICATION_FROM;
+
+    if (resendApiKey && emailFrom) {
+      const resend = new Resend(resendApiKey);
+      const emailResult = await resend.emails.send({
+        from: emailFrom,
+        to: verifiedRegistration.email,
+        subject: "Welcome to MooGold — Your Account Has Been Successfully Created",
+        text: `Hello ${user.fullName?.trim().split(/\s+/)[0] || "there"},
+
+Your MooGold account has been successfully created.
+
+You have completed your registration and PIN setup. Welcome to MooGold!
+
+You can now sign in using your registered phone number and 4-digit PIN.
+
+Thank you for choosing MooGold.
+
+More than a wallet.
+The MooGold Team`,
+      });
+
+      if (emailResult.error) {
+        console.error("Registration succeeded, but welcome email sending failed:", emailResult.error);
+      }
+    } else {
+      console.error("Registration succeeded, but welcome email was skipped because email configuration is incomplete.");
+    }
+  } catch (emailError) {
+    console.error("Registration succeeded, but welcome email delivery failed:", emailError);
+  }
+
   const firstName = user.fullName?.trim().split(/\s+/)[0] || "there";
 
   return {
@@ -1362,6 +1398,83 @@ export async function signOut() {
  * ============================================================
  */
 
+type PinResetAuthorization = {
+  userId: string;
+  phone: string;
+  issuedAt: number;
+};
+
+const PIN_RESET_COOKIE = "moogold-pin-reset";
+const PIN_RESET_TTL_SECONDS = 15 * 60;
+
+function readPinResetAuthorization(
+  cookieValue: string | undefined,
+  secret: string,
+): PinResetAuthorization | null {
+  if (!cookieValue) return null;
+
+  const parts = cookieValue.split(".");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    return null;
+  }
+
+  const [encodedPayload, suppliedSignature] = parts;
+  const expectedSignature = signPendingRegistration(
+    encodedPayload,
+    secret,
+  );
+
+  const expectedBytes = Buffer.from(
+    expectedSignature,
+    "base64url",
+  );
+  const suppliedBytes = Buffer.from(
+    suppliedSignature,
+    "base64url",
+  );
+
+  if (
+    expectedBytes.length !== suppliedBytes.length ||
+    !timingSafeEqual(expectedBytes, suppliedBytes)
+  ) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(encodedPayload, "base64url").toString("utf8"),
+    ) as Partial<PinResetAuthorization>;
+
+    if (
+      typeof parsed.userId !== "string" ||
+      !parsed.userId ||
+      typeof parsed.phone !== "string" ||
+      !parsed.phone ||
+      typeof parsed.issuedAt !== "number" ||
+      !Number.isSafeInteger(parsed.issuedAt)
+    ) {
+      return null;
+    }
+
+    const ageSeconds = Math.floor(Date.now() / 1000) - parsed.issuedAt;
+
+    if (
+      ageSeconds < 0 ||
+      ageSeconds > PIN_RESET_TTL_SECONDS
+    ) {
+      return null;
+    }
+
+    return {
+      userId: parsed.userId,
+      phone: parsed.phone,
+      issuedAt: parsed.issuedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function requestPinResetOtp(
   formData: FormData,
 ): Promise<ActionResult> {
@@ -1402,13 +1515,19 @@ export async function requestPinResetOtp(
       },
     },
     select: {
+      authUserId: true,
+      email: true,
       phone: true,
       countryCode: true,
     },
   });
 
   const user = matchingUsers.find((candidateUser) =>
-    Boolean(candidateUser.phone && candidateUser.countryCode) &&
+    Boolean(
+      candidateUser.authUserId &&
+      candidateUser.phone &&
+      candidateUser.countryCode,
+    ) &&
     uniqueCandidates.some(
       (candidate) =>
         candidate.phone === candidateUser.phone &&
@@ -1416,7 +1535,7 @@ export async function requestPinResetOtp(
     ),
   );
 
-  // Keep the response generic for accounts that do not match.
+  // Keep unknown accounts from being disclosed.
   if (!user || !user.phone || !user.countryCode) {
     return {
       success: true,
@@ -1425,154 +1544,158 @@ export async function requestPinResetOtp(
     };
   }
 
-  const userCountry = COUNTRIES.find(
-    (country) => country.code === user.countryCode,
-  );
+  const email = user.email?.trim().toLowerCase();
 
-  if (!userCountry) {
+  if (!email || !user.authUserId) {
     return {
-      success: true,
-      phone: uniqueCandidates[0].phone,
-      countryCode: uniqueCandidates[0].countryCode,
+      error:
+        "This account does not have a registered email address for PIN recovery. Please contact MooGold support.",
     };
   }
 
   const { error } = await supabase.auth.signInWithOtp({
-    phone: user.phone,
+    email,
     options: {
       shouldCreateUser: false,
     },
   });
 
   if (error) {
-    console.error("PIN reset OTP error:", error);
+    console.error("PIN reset email OTP error:", error);
     return {
       error:
-        "We could not send the verification code. Please try again.",
+        "We could not send the verification code to your registered email. Please try again.",
     };
   }
 
   return {
     success: true,
     phone: user.phone,
-    countryCode: userCountry.code,
+    countryCode: user.countryCode as SupportedCountry,
   };
 }
+
 export async function verifyPinResetOtp(
   formData: FormData,
 ): Promise<ActionResult> {
   const supabase = await createClient();
 
-  const phone =
-    getString(formData, "phone");
-
-  const token =
-    getString(formData, "token");
+  const phone = getString(formData, "phone");
+  const token = getString(formData, "token");
 
   if (!phone) {
     return {
-      error:
-        "Your phone number is missing.",
+      error: "Your phone number is missing.",
     };
   }
 
   if (!/^\d{6}$/.test(token)) {
     return {
-      error:
-        "Please enter the 6-digit verification code.",
+      error: "Please enter the 6-digit verification code.",
     };
   }
 
-  const phoneResult =
-    normalizePhone(phone);
+  const phoneResult = normalizePhone(phone);
 
   if (!phoneResult) {
     return {
-      error:
-        "Please enter a valid mobile number.",
+      error: "Please enter a valid mobile number.",
     };
   }
 
-  const user =
-    await prisma.user.findUnique({
-      where: {
-        phone: phoneResult.phone,
-      },
-      select: {
-        authUserId: true,
-      },
-    });
-
-  if (!user) {
-    return {
-      error:
-        "We could not verify this account.",
-    };
-  }
-
-  const {
-    data,
-    error,
-  } =
-    await supabase.auth.verifyOtp({
+  const user = await prisma.user.findUnique({
+    where: {
       phone: phoneResult.phone,
-      token,
-      type: "sms",
-    });
+    },
+    select: {
+      id: true,
+      authUserId: true,
+      email: true,
+      phone: true,
+    },
+  });
+
+  const email = user?.email?.trim().toLowerCase();
+
+  if (!user || !user.authUserId || !user.phone || !email) {
+    return {
+      error: "We could not verify this account.",
+    };
+  }
+
+  const { data, error } = await supabase.auth.verifyOtp({
+    email,
+    token,
+    type: "email",
+  });
 
   if (
     error ||
     !data.user ||
-    data.user.id !==
-      user.authUserId
+    data.user.id !== user.authUserId ||
+    data.user.email?.trim().toLowerCase() !== email
   ) {
     await supabase.auth.signOut();
 
     return {
-      error:
-        "The verification code is invalid or has expired.",
+      error: "The verification code is invalid or has expired.",
     };
   }
 
-  const {
-    error: metadataError,
-  } =
-    await supabase.auth.updateUser({
-      data: {
-        pinResetVerified: true,
-        pinResetPhone:
-          phoneResult.phone,
-      },
-    });
+  // Do not leave the temporary OTP session signed in.
+  await supabase.auth.signOut();
 
-  if (metadataError) {
-    console.error(
-      "PIN reset authorization error:",
-      metadataError,
-    );
+  const secret = process.env.MOOGOLD_AUTH_SECRET;
 
+  if (!secret) {
+    console.error("PIN reset authorization secret is missing.");
     return {
       error:
         "We could not start the PIN reset process. Please try again.",
     };
   }
 
+  const authorization: PinResetAuthorization = {
+    userId: user.id,
+    phone: user.phone,
+    issuedAt: Math.floor(Date.now() / 1000),
+  };
+
+  const encodedPayload = Buffer.from(
+    JSON.stringify(authorization),
+    "utf8",
+  ).toString("base64url");
+
+  const signature = signPendingRegistration(
+    encodedPayload,
+    secret,
+  );
+
+  const cookieStore = await cookies();
+
+  cookieStore.set(
+    PIN_RESET_COOKIE,
+    `${encodedPayload}.${signature}`,
+    {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: PIN_RESET_TTL_SECONDS,
+    },
+  );
+
   return {
     success: true,
-    phone: phoneResult.phone,
+    phone: user.phone,
   };
 }
 
 export async function resetPin(
   formData: FormData,
 ): Promise<ActionResult> {
-  const supabase = await createClient();
-
-  const pin =
-    getString(formData, "pin");
-
-  const confirmPin =
-    getString(formData, "confirmPin");
+  const pin = getString(formData, "pin");
+  const confirmPin = getString(formData, "confirmPin");
 
   if (!isValidPin(pin)) {
     return {
@@ -1583,97 +1706,73 @@ export async function resetPin(
 
   if (pin !== confirmPin) {
     return {
-      error:
-        "The PINs do not match.",
+      error: "The PINs do not match.",
     };
   }
 
-  const {
-    data: {
-      user: authUser,
-    },
-  } = await supabase.auth.getUser();
+  const secret = process.env.MOOGOLD_AUTH_SECRET;
+  const cookieStore = await cookies();
 
-  if (!authUser) {
-    return {
-      error:
-        "Your verification session has expired. Please start again.",
-    };
-  }
+  const authorization =
+    secret
+      ? readPinResetAuthorization(
+          cookieStore.get(PIN_RESET_COOKIE)?.value,
+          secret,
+        )
+      : null;
 
-  const metadata =
-    authUser.user_metadata ?? {};
+  if (!authorization) {
+    cookieStore.set(PIN_RESET_COOKIE, "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
 
-  const resetVerified =
-    metadata.pinResetVerified === true;
-
-  const resetPhone =
-    typeof metadata.pinResetPhone ===
-    "string"
-      ? metadata.pinResetPhone
-      : "";
-
-  if (
-    !resetVerified ||
-    !resetPhone
-  ) {
     return {
       error:
         "Your PIN reset session is invalid or has expired. Please start again.",
     };
   }
 
-  const user =
-    await prisma.user.findUnique({
-      where: {
-        authUserId: authUser.id,
-      },
-      select: {
-        id: true,
-        phone: true,
-      },
-    });
+  const user = await prisma.user.findUnique({
+    where: {
+      id: authorization.userId,
+    },
+    select: {
+      id: true,
+      authUserId: true,
+      phone: true,
+    },
+  });
 
   if (
     !user ||
-    user.phone !== resetPhone
+    !user.authUserId ||
+    user.phone !== authorization.phone
   ) {
     return {
-      error:
-        "We could not verify your MooGold account.",
+      error: "We could not verify your MooGold account.",
     };
   }
 
-  const pinHash =
-    await hashPin(pin);
-
-  await prisma.user.update({
-    where: {
-      id: user.id,
-    },
-    data: {
-      pinHash,
-      pinCreatedAt: new Date(),
-    },
-  });
+  const pinHash = await hashPin(pin);
 
   /*
    * Keep the internal Supabase credential synchronized
    * with the new MooGold PIN.
    */
-  const credential =
-    getSupabaseLoginCredential(
-      authUser.id,
-      pin,
-    );
+  const credential = getSupabaseLoginCredential(
+    user.authUserId,
+    pin,
+  );
 
   const admin = createAdminClient();
 
-  const {
-    error: passwordError,
-  } =
+  const { error: passwordError } =
     await admin.auth.admin.updateUserById(
-      authUser.id,
+      user.authUserId,
       {
         password: credential,
       },
@@ -1687,18 +1786,27 @@ export async function resetPin(
 
     return {
       error:
-        "Your PIN was changed, but we could not finish updating your secure login. Please try signing in again.",
+        "We could not finish updating your secure login. Please try again.",
     };
   }
 
-  await supabase.auth.updateUser({
+  await prisma.user.update({
+    where: {
+      id: user.id,
+    },
     data: {
-      pinResetVerified: false,
-      pinResetPhone: null,
+      pinHash,
+      pinCreatedAt: new Date(),
     },
   });
 
-  await supabase.auth.signOut();
+  cookieStore.set(PIN_RESET_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
 
   return {
     success: true,

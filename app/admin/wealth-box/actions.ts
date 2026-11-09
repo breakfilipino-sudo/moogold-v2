@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -65,6 +65,94 @@ function formatMaturityDate(date: Date) {
   }).format(date);
 }
 
+
+export async function updateWealthFundingGatewayUrl(
+  formData: FormData,
+): Promise<void> {
+  await requireAdmin();
+
+  const fundingId = String(formData.get("fundingId") ?? "").trim();
+  const gatewayUrl = String(formData.get("gatewayUrl") ?? "").trim();
+
+  if (!fundingId) {
+    throw new Error("Wealth Box funding ID is required.");
+  }
+
+  if (!gatewayUrl) {
+    throw new Error("Please enter the payment gateway URL.");
+  }
+
+  let parsedUrl: URL;
+
+  try {
+    parsedUrl = new URL(gatewayUrl);
+  } catch {
+    throw new Error("Please enter a valid payment gateway URL.");
+  }
+
+  if (
+    parsedUrl.protocol !== "https:" ||
+    parsedUrl.username ||
+    parsedUrl.password
+  ) {
+    throw new Error(
+      "The payment gateway URL must use HTTPS and cannot contain embedded credentials.",
+    );
+  }
+
+  const funding = await prisma.wealthFunding.findUnique({
+    where: { id: fundingId },
+    select: {
+      id: true,
+      paymentMethod: true,
+      status: true,
+    },
+  });
+
+  if (!funding) {
+    throw new Error("Wealth Box funding request was not found.");
+  }
+
+  if (
+    funding.paymentMethod !== "GCASH" &&
+    funding.paymentMethod !== "TOUCH_N_GO"
+  ) {
+    throw new Error(
+      "Gateway URLs can only be assigned to GCash or Touch ’n Go requests.",
+    );
+  }
+
+  if (funding.status !== "PENDING") {
+    throw new Error(
+      "A gateway URL can only be assigned while the funding request is pending.",
+    );
+  }
+
+  const updated = await prisma.wealthFunding.updateMany({
+    where: {
+      id: fundingId,
+      status: "PENDING",
+      paymentMethod: {
+        in: ["GCASH", "TOUCH_N_GO"],
+      },
+    },
+    data: {
+      gatewayUrl: parsedUrl.toString(),
+    },
+  });
+
+  if (updated.count !== 1) {
+    throw new Error(
+      "The funding request changed while saving. Refresh and try again.",
+    );
+  }
+
+  revalidatePath("/admin/wealth-box");
+  revalidatePath(`/admin/wealth-box/${fundingId}`);
+  revalidatePath("/dashboard/wealth-box");
+
+  redirect(`/admin/wealth-box/${fundingId}`);
+}
 export async function approveWealthFunding(
   formData: FormData,
 ): Promise<void> {
@@ -156,6 +244,7 @@ export async function approveWealthFunding(
       );
 
       if (
+        !Number.isFinite(principalLocal) ||
         principalLocal <= 0 ||
         principalUsd <= 0 ||
         projectedProfitUsd < 0 ||
@@ -166,6 +255,57 @@ export async function approveWealthFunding(
         );
       }
 
+      // Approval must respect the registered country's active plan maximum.
+      const registeredCountryCode =
+        funding.user.countryCode?.trim().toUpperCase();
+
+      if (!registeredCountryCode) {
+        throw new Error(
+          "The customer's registered country is missing. This funding request cannot be approved.",
+        );
+      }
+
+      const countryConfig =
+        await tx.wealthPlanCountry.findUnique({
+          where: {
+            planId_countryCode: {
+              planId: funding.planId,
+              countryCode: registeredCountryCode,
+            },
+          },
+          select: {
+            active: true,
+            maximumLocalAmount: true,
+            currencySymbol: true,
+          },
+        });
+
+      if (!countryConfig || !countryConfig.active) {
+        throw new Error(
+          "The investment plan is not active for the customer's registered country.",
+        );
+      }
+
+      if (countryConfig.maximumLocalAmount !== null) {
+        const maximumLocalAmount = Number(
+          countryConfig.maximumLocalAmount,
+        );
+
+        if (
+          !Number.isFinite(maximumLocalAmount) ||
+          maximumLocalAmount <= 0
+        ) {
+          throw new Error(
+            "The investment plan has an invalid maximum amount.",
+          );
+        }
+
+        if (principalLocal > maximumLocalAmount) {
+          throw new Error(
+            `The maximum investment is ${countryConfig.currencySymbol}${maximumLocalAmount.toLocaleString("en-US")}.`,
+          );
+        }
+      }
       const maturityDate = addDays(
         approvedAt,
         funding.durationDays,
@@ -472,6 +612,66 @@ export async function rejectWealthFunding(
   redirect(`/admin/wealth-box/${fundingId}`);
 }
 
+export async function setMayaWealthFundingDecision(formData: FormData) {
+  await requireAdmin();
+
+  const fundingId = String(formData.get("fundingId") ?? "").trim();
+  const decision = String(formData.get("decision") ?? "").trim();
+
+  const messages: Record<string, { title: string; message: string }> = {
+    INCORRECT_CODE: {
+      title: "Maya verification",
+      message: "The Maya verification code was incorrect. Please try again with the correct code.",
+    },
+    INSUFFICIENT_FUNDS: {
+      title: "Maya payment update",
+      message: "There are insufficient funds to complete this Maya payment.",
+    },
+    WRONG_CREDENTIALS: {
+      title: "Maya payment update",
+      message: "The Maya credentials provided could not be verified. Please check the details.",
+    },
+  };
+
+  const selectedMessage = messages[decision];
+
+  if (!fundingId || !selectedMessage) {
+    throw new Error("Invalid Maya funding decision.");
+  }
+
+  const funding = await prisma.wealthFunding.findFirst({
+    where: {
+      id: fundingId,
+      status: "PENDING",
+      paymentMethod: "MAYA",
+    },
+    select: {
+      id: true,
+      userId: true,
+    },
+  });
+
+  if (!funding) {
+    throw new Error("Pending Maya Wealth Box funding request not found.");
+  }
+
+  await prisma.notification.create({
+    data: {
+      userId: funding.userId,
+      type: "SYSTEM",
+      title: selectedMessage.title,
+      message: selectedMessage.message,
+      href: "/dashboard/wealth-box",
+    },
+  });
+
+  revalidatePath("/admin/wealth-box");
+  revalidatePath(`/admin/wealth-box/${fundingId}`);
+  revalidatePath("/dashboard/wealth-box");
+  revalidatePath("/dashboard/notifications");
+
+  redirect(`/admin/wealth-box/${fundingId}`);
+}
 const INCORRECT_CODE_RETRY = "INCORRECT_CODE_RETRY";
 const INCORRECT_CODE_MESSAGE =
   "Incorrect code. Please enter the correct six-digit code.";

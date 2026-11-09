@@ -354,12 +354,12 @@ function ForgotPinVerifyContent() {
             </p>
 
             <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-              Verify your number
+              Verify your email
             </h1>
 
             <p className="mt-1.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
-              Enter the 6-digit verification code
-              sent to
+              Enter the 6-digit verification code sent to your
+              registered email address. This account is linked to:
             </p>
 
             <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">
@@ -378,7 +378,7 @@ function ForgotPinVerifyContent() {
 
             <div className="p-4">
               <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Verification code
+                Email verification code
               </p>
 
               <div className="flex justify-between gap-1.5 sm:justify-start sm:gap-2">
@@ -454,7 +454,7 @@ function ForgotPinVerifyContent() {
                     onClick={handleResend}
                     className="text-xs font-black text-emerald-600 hover:text-emerald-500 dark:text-emerald-400"
                   >
-                    Send a new code
+                    Resend email code
                   </button>
                 )}
               </div>

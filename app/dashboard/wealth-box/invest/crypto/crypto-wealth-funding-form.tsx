@@ -9,65 +9,84 @@ Copy,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { createCryptoWealthFunding } from "@/app/dashboard/wealth-box/actions";
+import {
+  createCryptoWealthFunding,
+  createCryptoWealthFundingQuote,
+} from "@/app/dashboard/wealth-box/actions";
 
 const CRYPTO_OPTIONS = [
-{
-asset: "USDT",
-network: "TRON",
-networkLabel: "Tron (TRC-20)",
-address:
-"TKrbT8qikYzZd8tBwPQ2teaLZCV4aJ5NKg",
-decimals: 6,
-},
-{
-asset: "USDC",
-network: "ETHEREUM",
-networkLabel: "Ethereum (ERC-20)",
-address:
-"0x12C844aeA5FFe9271fb6f2F1e1fd1811512B4ad1",
-decimals: 6,
-},
-{
-asset: "BTC",
-network: "BITCOIN",
-networkLabel: "Bitcoin",
-address:
-"33a54tDd51n13TMYi6KqZ3WUdo2LpQcnqC",
-decimals: 8,
-},
-{
-asset: "ETH",
-network: "ETHEREUM",
-networkLabel: "Ethereum (ERC-20)",
-address:
-"0xae70A129dfd37186C70697494B08c4151C408717",
-decimals: 8,
-},
-{
-asset: "SOL",
-network: "SOLANA",
-networkLabel: "Solana",
-address:
-"GFenbSRhcZwPg7KE85AJS4AB7khUeVdBkUSQjuJj2xDj",
-decimals: 6,
-},
-{
-asset: "TRN",
-network: "TRON",
-networkLabel: "Tron",
-address:
-"TLGGvkFbJWtT3jvxx8uss14Mshmrz7Kenx",
-decimals: 6,
-},
-{
-asset: "XLM",
-network: "STELLAR",
-networkLabel: "Stellar",
-address:
-"GD5LP2XKZV2QJBY3VIJTTC6ECN3LGJQMCJXSAYPPXZHWGVTJOQM5H3MP",
-decimals: 7,
-},
+  {
+    asset: "USDT",
+    network: "TRON",
+    networkLabel: "Tron (TRC20)",
+    address: "TJKxnXkwhH8fC9qY9g8YXvCoHSqyZ1oR12",
+    memo: undefined,
+    decimals: 6,
+  },
+  {
+    asset: "USDC",
+    network: "ETHEREUM",
+    networkLabel: "Ethereum (ERC20)",
+    address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+    memo: undefined,
+    decimals: 6,
+  },
+  {
+    asset: "BTC",
+    network: "BITCOIN",
+    networkLabel: "Bitcoin",
+    address: "16GZmP9ybu1m1wYvzG5D4Q6aCrxn3ebYgU",
+    memo: undefined,
+    decimals: 8,
+  },
+  {
+    asset: "BNB",
+    network: "BNB_SMART_CHAIN",
+    networkLabel: "BNB Smart Chain (BEP20)",
+    address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+    memo: undefined,
+    decimals: 18,
+  },
+  {
+    asset: "ETH",
+    network: "ETHEREUM",
+    networkLabel: "Ethereum (ERC20)",
+    address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+    memo: undefined,
+    decimals: 18,
+  },
+  {
+    asset: "SOL",
+    network: "SOLANA",
+    networkLabel: "Solana",
+    address: "orwuXMAC81ivmAKR5X4oB4hpvRzmfE7jSUXdrjQYgkv",
+    memo: undefined,
+    decimals: 9,
+  },
+  {
+    asset: "XLM",
+    network: "STELLAR",
+    networkLabel: "Stellar",
+    address: "GABFQIK63R2NETJM7T673EAMZN4RJLLGP3OFUEJU5SZVTGWUKULZJNL6",
+    memo: "401607474",
+    decimals: 7,
+  },
+  {
+    asset: "TRX",
+    network: "TRON",
+    networkLabel: "Tron (TRC20)",
+    address: "TJKxnXkwhH8fC9qY9g8YXvCoHSqyZ1oR12",
+    memo: undefined,
+    decimals: 6,
+  },
+  {
+    asset: "SUI",
+    network: "SUI",
+    networkLabel: "Sui",
+    address: "0xfe65cba4a2b4f67b13e68c548460d129fa0b0b9cae6f6e2d5d8ce0adaa94c8ab",
+    memo: undefined,
+    decimals: 9,
+  },
 ] as const;
 
 type CryptoWealthFundingFormProps = {
@@ -75,9 +94,13 @@ planId: string;
 amount: string;
 currency: string;
 localAmount: number;
-usdAmount: number;
+
 };
 
+type CryptoWealthQuote = Extract<
+  Awaited<ReturnType<typeof createCryptoWealthFundingQuote>>,
+  { success: true }
+>;
 function formatLocal(
 value: number,
 currency: string,
@@ -109,158 +132,106 @@ useGrouping: false,
 });
 }
 
-function roundUpToDecimals(
-value: number,
-decimals: number,
-) {
-const multiplier = 10 ** decimals;
-
-return (
-Math.ceil(value * multiplier) /
-multiplier
-);
-}
-
 export default function CryptoWealthFundingForm({
 planId,
 amount,
 currency,
 localAmount,
-usdAmount,
+
 }: CryptoWealthFundingFormProps) {
 const router = useRouter();
 
 const [selectedAsset, setSelectedAsset] =
 useState("USDT");
 
-const [cryptoPrice, setCryptoPrice] =
-useState<number | null>(null);
+const [quote, setQuote] =
+  useState<CryptoWealthQuote | null>(null);
 
 const [quoteLoading, setQuoteLoading] =
-useState(true);
+  useState(true);
 
 const [quoteError, setQuoteError] =
-useState("");
+  useState("");
 
-const [copied, setCopied] =
-useState(false);
+const [quoteRefreshKey, setQuoteRefreshKey] =
+  useState(0);
+
+const [copied, setCopied] = useState(false);
+
+const [memoCopied, setMemoCopied] = useState(false);
 
 const [loading, setLoading] =
-useState(false);
+  useState(false);
 
 const [submitted, setSubmitted] =
-useState(false);
+  useState(false);
 
 const [error, setError] =
-useState("");
+  useState("");
 
 const selected = useMemo(
-() =>
-CRYPTO_OPTIONS.find(
-(item) =>
-item.asset === selectedAsset,
-) ?? CRYPTO_OPTIONS[0],
-[selectedAsset],
+  () =>
+    CRYPTO_OPTIONS.find(
+      (item) => item.asset === selectedAsset,
+    ) ?? CRYPTO_OPTIONS[0],
+  [selectedAsset],
 );
 
 useEffect(() => {
-let cancelled = false;
+  let cancelled = false;
 
-async function loadQuote() {
-  setQuoteLoading(true);
-  setQuoteError("");
-  setCryptoPrice(null);
+  async function loadQuote() {
+    setQuoteLoading(true);
+    setQuoteError("");
+    setQuote(null);
 
-  try {
-    const response = await fetch(
-      `/api/crypto/quote?asset=${encodeURIComponent(
+    try {
+      const result = await createCryptoWealthFundingQuote(
+        planId,
+        amount,
         selected.asset,
-      )}`,
-      {
-        method: "GET",
-        cache: "no-store",
-      },
-    );
-
-    const data =
-      (await response.json()) as {
-        usdPrice?: number;
-        error?: string;
-      };
-
-    if (!response.ok) {
-      throw new Error(
-        data.error ??
-          "Crypto price is temporarily unavailable.",
       );
-    }
 
-    if (
-      typeof data.usdPrice !== "number" ||
-      !Number.isFinite(data.usdPrice) ||
-      data.usdPrice <= 0
-    ) {
-      throw new Error(
-        "Crypto price is temporarily unavailable.",
-      );
-    }
+      if (!result.success) {
+        throw new Error(result.error);
+      }
 
-    if (!cancelled) {
-      setCryptoPrice(data.usdPrice);
-    }
-  } catch (quoteError) {
-    if (!cancelled) {
-      setQuoteError(
-        quoteError instanceof Error
-          ? quoteError.message
-          : "Crypto price is temporarily unavailable.",
-      );
-    }
-  } finally {
-    if (!cancelled) {
-      setQuoteLoading(false);
+      if (!cancelled) {
+        setQuote(result);
+      }
+    } catch (quoteError) {
+      if (!cancelled) {
+        setQuoteError(
+          quoteError instanceof Error
+            ? quoteError.message
+            : "Unable to calculate the crypto payment amount. Please try again.",
+        );
+      }
+    } finally {
+      if (!cancelled) {
+        setQuoteLoading(false);
+      }
     }
   }
-}
 
-void loadQuote();
+  void loadQuote();
 
-return () => {
-  cancelled = true;
-};
+  return () => {
+    cancelled = true;
+  };
+}, [planId, amount, selected.asset, quoteRefreshKey]);
 
-}, [selected.asset]);
-
-const cryptoAmount = useMemo(() => {
-if (
-!cryptoPrice ||
-!Number.isFinite(cryptoPrice) ||
-cryptoPrice <= 0 ||
-usdAmount <= 0
-) {
-return 0;
-}
-
-const rawAmount =
-  usdAmount / cryptoPrice;
-
-return roundUpToDecimals(
-  rawAmount,
-  selected.decimals,
-);
-
-}, [
-cryptoPrice,
-usdAmount,
-selected.decimals,
-]);
+const cryptoAmount = quote
+  ? Number(quote.cryptoAmount)
+  : 0;
 
 const canSubmit =
-!quoteLoading &&
-!quoteError &&
-cryptoAmount > 0 &&
-!loading;
-
+  !quoteLoading &&
+  !quoteError &&
+  quote !== null &&
+  Boolean(quote.token) &&
+  cryptoAmount > 0 &&
+  !loading;
 async function copyAddress() {
 setError("");
 
@@ -321,42 +292,81 @@ try {
 
 }
 
-async function handleSubmit() {
-setError("");
+async function copyMemo() {
+  if (!selected.memo) return;
 
-if (!cryptoAmount) {
-  setError(
-    "Please wait for the current crypto payment amount to load.",
-  );
-  return;
+  setError("");
+
+  try {
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.clipboard &&
+      window.isSecureContext
+    ) {
+      await navigator.clipboard.writeText(selected.memo);
+    } else {
+      const textArea = document.createElement("textarea");
+      textArea.value = selected.memo;
+      textArea.setAttribute("readonly", "");
+      textArea.style.position = "fixed";
+      textArea.style.left = "-9999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+
+      const copiedSuccessfully = document.execCommand("copy");
+      document.body.removeChild(textArea);
+
+      if (!copiedSuccessfully) {
+        throw new Error("Copy failed");
+      }
+    }
+
+    setMemoCopied(true);
+    window.setTimeout(() => setMemoCopied(false), 2000);
+  } catch {
+    setError("Unable to copy the Stellar memo. Please copy it manually.");
+  }
 }
+async function handleSubmit() {
+  setError("");
 
-setLoading(true);
-
-try {
-  const result =
-    await createCryptoWealthFunding(
-      planId,
-      amount,
-      selectedAsset,
+  if (!quote || !cryptoAmount) {
+    setError(
+      "Please wait for the current crypto payment quote to load.",
     );
-
-  if (!result.success) {
-    setError(result.error);
     return;
   }
 
-  setSubmitted(true);
-} catch {
-  setError(
-    "We could not submit your crypto payment. Please try again.",
-  );
-} finally {
-  setLoading(false);
-}
+  setLoading(true);
 
-}
+  try {
+    const result = await createCryptoWealthFunding(
+      planId,
+      amount,
+      selectedAsset,
+      quote.token,
+    );
 
+    if (!result.success) {
+      setError(result.error);
+
+      if (result.error.toLowerCase().includes("expired")) {
+        setQuoteRefreshKey((current) => current + 1);
+      }
+
+      return;
+    }
+
+    setSubmitted(true);
+  } catch {
+    setError(
+      "We could not submit your crypto payment. Please try again.",
+    );
+  } finally {
+    setLoading(false);
+  }
+}
 if (submitted) {
 return ( <div className="mt-5"> <section className="rounded-[24px] border border-emerald-200 bg-emerald-50 p-6 sm:p-7"> <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white"> <Check className="h-6 w-6" /> </div>
 
@@ -541,6 +551,8 @@ Investment amount </p>
               <p className="mt-2 text-xs font-medium text-white/65">
                 Send exactly this amount.
               </p>
+
+
             </div>
           )}
         </div>
@@ -585,6 +597,39 @@ Investment amount </p>
       </code>
     </div>
   </section>
+
+  {selected.memo ? (
+    <section className="mt-4 rounded-[24px] border border-amber-300 bg-amber-50 p-5 sm:p-6">
+      <p className="text-sm font-black text-amber-950">
+        Stellar memo — required
+      </p>
+      <p className="mt-1 text-xs leading-5 text-amber-800">
+        Include this memo when sending XLM. Omitting it may result in lost funds.
+      </p>
+      <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-white p-4 sm:flex-row sm:items-center">
+        <code className="min-w-0 flex-1 break-all text-sm font-bold text-[#10201b]">
+          {selected.memo}
+        </code>
+        <button
+          type="button"
+          onClick={copyMemo}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#10201b] px-4 py-3 text-xs font-bold text-white"
+        >
+          {memoCopied ? (
+            <>
+              <Check className="h-3.5 w-3.5" />
+              Copied
+            </>
+          ) : (
+            <>
+              <Copy className="h-3.5 w-3.5" />
+              Copy memo
+            </>
+          )}
+        </button>
+      </div>
+    </section>
+  ) : null}
 
   <div className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3">
     <p className="text-xs font-bold leading-5 text-amber-950">

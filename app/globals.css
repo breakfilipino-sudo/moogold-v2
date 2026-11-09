@@ -582,3 +582,58 @@ body:has(.registration-page-offwhite) {
 .dark .moogold-landing [class*="border-[#dfe8e2]"] {
   border-color: #34483e !important;
 }
+
+/* GCash waiting page: fit the dashboard viewport without page scrolling. */
+html:has(.gcash-waiting-page),
+body:has(.gcash-waiting-page) {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+body:has(.gcash-waiting-page) {
+  padding-bottom: 0;
+}
+
+.moogold-dashboard-theme:has(.gcash-waiting-page) {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.moogold-dashboard-theme:has(.gcash-waiting-page) > div {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.moogold-dashboard-theme:has(.gcash-waiting-page) > div > div:last-child {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.moogold-dashboard-theme:has(.gcash-waiting-page) > div > div:last-child > main {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 0;
+  padding-bottom: 6rem;
+}
+
+.gcash-waiting-page {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .moogold-dashboard-theme:has(.gcash-waiting-page) > div > div:last-child > main {
+    padding-bottom: 1.5rem;
+  }
+}

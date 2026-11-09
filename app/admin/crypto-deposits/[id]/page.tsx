@@ -218,6 +218,14 @@ export default async function AdminCryptoDepositPage({
                     mono
                   />
 
+                  {deposit.asset === "XLM" && (
+                    <InfoRow
+                      label="Stellar Memo"
+                      value={deposit.memo || "Not provided"}
+                      mono
+                    />
+                  )}
+
                   <InfoRow
                     label="Sender Address"
                     value={
