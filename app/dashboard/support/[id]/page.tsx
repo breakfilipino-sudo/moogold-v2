@@ -332,7 +332,7 @@ export default async function SupportConversationPage({
                                 {isCustomer
                                   ? "You"
                                   : "Customer Service"}{" "}
-                                â€¢{" "}
+                                {"•"}{" "}
                                 {formatMessageTime(
                                   message.createdAt,
                                 )}
