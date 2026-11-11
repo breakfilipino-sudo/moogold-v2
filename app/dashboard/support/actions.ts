@@ -542,7 +542,7 @@ export async function createSupportConversation(
     `/dashboard/support/${conversation.id}`,
   );
 
-  void sendAdminEmailAlert({
+  await sendAdminEmailAlert({
     subject: "New customer support conversation",
     message:
       `A new support conversation requires admin attention.\n` +
