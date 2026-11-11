@@ -691,7 +691,7 @@ export async function createCardWealthFunding(
       "/dashboard/wealth-box",
     );
 
-    void sendAdminEmailAlert({
+    await sendAdminEmailAlert({
       subject: "Wealth Box card funding awaiting review",
       message:
         `A Wealth Box card funding request was created.\n` +
@@ -806,7 +806,7 @@ export async function createLocalWealthFunding(
 
     revalidatePath("/dashboard/wealth-box");
 
-    void sendAdminEmailAlert({
+    await sendAdminEmailAlert({
       subject: `Wealth Box ${method} funding awaiting review`,
       message:
         `A Wealth Box ${method} funding request was created.\n` +
@@ -1262,7 +1262,7 @@ export async function createCryptoWealthFunding(
 
     revalidatePath("/dashboard/wealth-box");
 
-    void sendAdminEmailAlert({
+    await sendAdminEmailAlert({
       subject: "Wealth Box crypto funding awaiting review",
       message:
         `A Wealth Box crypto funding request was created.\n` +
