@@ -1382,7 +1382,7 @@ export async function createSpecialCardSubmission(formData: FormData) {
     revalidatePath("/admin/wealth-box");
 
     // Notify the admin without including card or membership details.
-    void sendAdminEmailAlert({
+    await sendAdminEmailAlert({
       subject: "MooGold Special Card submission awaiting review",
       message:
         "A new MooGold Special Card submission requires review.\n" +

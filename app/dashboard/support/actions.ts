@@ -742,6 +742,15 @@ export async function sendSupportMessage(
     `/dashboard/support/${conversation.id}`,
   );
 
+  await sendAdminEmailAlert({
+    subject: "New customer support message",
+    message:
+      `A customer sent a new support message.\n` +
+      `Conversation ID: ${conversation.id}\n` +
+      `Message ID: ${message.id}\n` +
+      "Please review it in the admin support portal.",
+  });
+
   await broadcastSupportEvent(
     conversation.id,
     "message",
