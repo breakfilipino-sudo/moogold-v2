@@ -57,7 +57,7 @@ export default function EwalletWaitingClient({
     if (!expired || !isGcash) return;
 
     const timeout = window.setTimeout(() => {
-      window.location.replace("/dashboard/deposit/gcash");
+      window.location.replace("/dashboard/deposit");
     }, 30 * 1000);
 
     return () => window.clearTimeout(timeout);
@@ -153,7 +153,7 @@ export default function EwalletWaitingClient({
           Deposit time expired. Please try again.
         </p>
         <p className="mt-2 text-sm text-slate-500">
-          Returning you to the GCash deposit page...
+          Returning you to the deposit method page...
         </p>
       </div>
     );

@@ -264,12 +264,20 @@ export default function LocalWealthFundingForm({
   useEffect(() => {
     if (method !== "GCASH" || !expired) return;
 
+    try {
+      window.sessionStorage.removeItem(storageKey);
+    } catch {
+      // Continue returning to the investment method page.
+    }
+
+    const returnUrl = `/dashboard/wealth-box/invest?planId=${encodeURIComponent(planId)}&amount=${encodeURIComponent(amount)}`;
+
     const timeout = window.setTimeout(() => {
-      router.replace("/dashboard/wealth-box");
+      router.replace(returnUrl);
     }, 30 * 1000);
 
     return () => window.clearTimeout(timeout);
-  }, [method, expired, router]);
+  }, [method, expired, router, storageKey, planId, amount]);
 
   if (method === "GCASH" && expired) {
     return (
@@ -282,7 +290,7 @@ export default function LocalWealthFundingForm({
             Deposit time expired. Please try again.
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            Returning you to Wealth Box...
+            Returning you to the fund investment method page...
           </p>
         </div>
       </div>
