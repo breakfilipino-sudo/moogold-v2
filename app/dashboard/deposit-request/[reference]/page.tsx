@@ -45,6 +45,8 @@ export default async function EwalletDepositWaitingPage({
       depositDetails: {
         select: {
           method: true,
+          gatewayUrl: true,
+          updatedAt: true,
         },
       },
     },
@@ -89,6 +91,11 @@ export default async function EwalletDepositWaitingPage({
           reference={transaction.reference}
           method={transaction.depositDetails.method}
           initialStatus={transaction.status}
+          initialGatewaySavedAt={
+            transaction.depositDetails.gatewayUrl
+              ? transaction.depositDetails.updatedAt.toISOString()
+              : null
+          }
         />
       </div>
     </main>

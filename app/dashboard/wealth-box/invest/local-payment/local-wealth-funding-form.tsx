@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -65,6 +66,9 @@ export default function LocalWealthFundingForm({
   const [localAmount, setLocalAmount] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(true);
+  const [gatewaySavedAt, setGatewaySavedAt] = useState<string | null>(null);
+  const [expired, setExpired] = useState(false);
+  const router = useRouter();
 
   const startedRef = useRef(false);
   const payment = METHOD_DETAILS[method];
@@ -169,21 +173,60 @@ export default function LocalWealthFundingForm({
   useEffect(() => {
     if (
       !fundingId ||
-      (method !== "GCASH" && method !== "TOUCH_N_GO")
+      (method !== "GCASH" && method !== "TOUCH_N_GO") ||
+      expired
     ) {
       return;
     }
 
     let active = true;
-    let redirecting = false;
 
     const checkGateway = async () => {
       try {
-        const url = await getLocalWealthFundingGatewayUrl(fundingId);
+        const result = await getLocalWealthFundingGatewayUrl(fundingId);
 
-        if (active && url && !redirecting) {
-          redirecting = true;
-          window.location.assign(url);
+        if (!active || !result || result.status !== "PENDING") return;
+
+        if (method === "GCASH" && result.gatewaySavedAt) {
+          setGatewaySavedAt(result.gatewaySavedAt);
+
+          const deadline =
+            new Date(result.gatewaySavedAt).getTime() + 14 * 60 * 1000;
+
+          if (Date.now() >= deadline) {
+            setExpired(true);
+            return;
+          }
+        }
+
+        if (!result.gatewayUrl) return;
+
+        if (method === "GCASH") {
+          const savedAt = result.gatewaySavedAt ?? "";
+          const marker = `moogold-wealth-gcash-gateway:${fundingId}`;
+          let alreadyOpened = false;
+
+          try {
+            alreadyOpened =
+              window.sessionStorage.getItem(marker) === savedAt;
+          } catch {
+            alreadyOpened = false;
+          }
+
+          if (alreadyOpened || !savedAt) return;
+
+          try {
+            window.sessionStorage.setItem(marker, savedAt);
+          } catch {
+            // Continue with the same-tab gateway redirect.
+          }
+
+          window.location.assign(result.gatewayUrl);
+          return;
+        }
+
+        if (method === "TOUCH_N_GO") {
+          window.location.assign(result.gatewayUrl);
         }
       } catch {
         // Retry on the next polling interval.
@@ -201,8 +244,50 @@ export default function LocalWealthFundingForm({
       active = false;
       window.clearInterval(interval);
     };
-  }, [fundingId, method]);
+  }, [fundingId, method, expired]);
 
+  useEffect(() => {
+    if (method !== "GCASH" || !gatewaySavedAt) return;
+
+    const deadline = new Date(gatewaySavedAt).getTime() + 14 * 60 * 1000;
+    const remaining = deadline - Date.now();
+
+    if (remaining <= 0) {
+      setExpired(true);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setExpired(true), remaining);
+    return () => window.clearTimeout(timeout);
+  }, [method, gatewaySavedAt]);
+
+  useEffect(() => {
+    if (method !== "GCASH" || !expired) return;
+
+    const timeout = window.setTimeout(() => {
+      router.replace("/dashboard/wealth-box");
+    }, 30 * 1000);
+
+    return () => window.clearTimeout(timeout);
+  }, [method, expired, router]);
+
+  if (method === "GCASH" && expired) {
+    return (
+      <div
+        className="mx-auto w-full max-w-sm px-4 py-8 text-center"
+        aria-live="assertive"
+      >
+        <div className="rounded-3xl border border-amber-200 bg-white p-7 shadow-sm">
+          <h1 className="text-lg font-extrabold text-slate-900">
+            Deposit time expired. Please try again.
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Returning you to Wealth Box...
+          </p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="mx-auto w-full max-w-sm space-y-6 px-4 py-8">
       <div className="space-y-2 rounded-2xl border border-slate-200 bg-white px-4 py-6 text-center shadow-sm">

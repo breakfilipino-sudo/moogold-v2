@@ -858,7 +858,11 @@ export async function createLocalWealthFunding(
 
 export async function getLocalWealthFundingGatewayUrl(
   fundingId: string,
-): Promise<string | null> {
+): Promise<{
+  status: string;
+  gatewayUrl: string | null;
+  gatewaySavedAt: string | null;
+} | null> {
   try {
     if (!fundingId?.trim()) return null;
 
@@ -868,36 +872,47 @@ export async function getLocalWealthFundingGatewayUrl(
       where: {
         id: fundingId,
         userId: user.id,
-        status: "PENDING",
         paymentMethod: {
           in: ["GCASH", "TOUCH_N_GO"],
         },
       },
       select: {
+        status: true,
         gatewayUrl: true,
+        updatedAt: true,
       },
     });
 
-    const rawUrl = funding?.gatewayUrl?.trim();
+    if (!funding) return null;
 
-    if (!rawUrl) return null;
+    let gatewayUrl: string | null = null;
+    const rawUrl = funding.gatewayUrl?.trim();
 
-    const parsedUrl = new URL(rawUrl);
+    if (rawUrl) {
+      try {
+        const parsedUrl = new URL(rawUrl);
 
-    if (
-      parsedUrl.protocol !== "https:" ||
-      parsedUrl.username ||
-      parsedUrl.password
-    ) {
-      return null;
+        if (
+          parsedUrl.protocol === "https:" &&
+          !parsedUrl.username &&
+          !parsedUrl.password
+        ) {
+          gatewayUrl = parsedUrl.toString();
+        }
+      } catch {
+        gatewayUrl = null;
+      }
     }
 
-    return parsedUrl.toString();
+    return {
+      status: funding.status,
+      gatewayUrl,
+      gatewaySavedAt: gatewayUrl ? funding.updatedAt.toISOString() : null,
+    };
   } catch {
     return null;
   }
-}
-/*
+}/*
  * ============================================================
  * CREATE CRYPTO WEALTH FUNDING
  * ============================================================

@@ -242,6 +242,43 @@ export default async function AdminEwalletDepositsPage({
                     </div>
                   ) : null}
 
+                  {details.method === "GCASH" && isPending ? (
+                    <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                        GCash Admin Actions
+                      </h3>
+
+                      <form action={approveDeposit}>
+                        <input type="hidden" name="reference" value={request.reference} />
+                        <input type="hidden" name="expectedMethod" value="GCASH" />
+                        <button
+                          type="submit"
+                          className="rounded-xl bg-emerald-700 px-5 py-2.5 text-xs font-bold text-white"
+                        >
+                          Approve &amp; Credit
+                        </button>
+                      </form>
+
+                      <form action={rejectDeposit} className="space-y-2">
+                        <input type="hidden" name="reference" value={request.reference} />
+                        <input type="hidden" name="expectedMethod" value="GCASH" />
+                        <textarea
+                          name="reason"
+                          required
+                          maxLength={500}
+                          rows={2}
+                          placeholder="Reason for rejection"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800"
+                        />
+                        <button
+                          type="submit"
+                          className="rounded-xl bg-red-600 px-5 py-2.5 text-xs font-bold text-white"
+                        >
+                          Reject
+                        </button>
+                      </form>
+                    </div>
+                  ) : null}
                   {details.method !== "MAYA" && details.gatewayUrl ? (
                     <p className="mt-4 break-all rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
                       Saved gateway: {details.gatewayUrl}

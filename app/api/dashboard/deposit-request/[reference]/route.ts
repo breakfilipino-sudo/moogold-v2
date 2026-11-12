@@ -44,6 +44,7 @@ export async function GET(
         select: {
           method: true,
           gatewayUrl: true,
+          updatedAt: true,
         },
       },
     },
@@ -78,6 +79,7 @@ export async function GET(
     {
       status: transaction.status,
       gatewayUrl,
+      gatewaySavedAt: gatewayUrl ? transaction.depositDetails.updatedAt.toISOString() : null,
     },
     {
       headers: { "Cache-Control": "no-store" },
