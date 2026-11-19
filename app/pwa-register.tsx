@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 
@@ -8,20 +8,10 @@ export default function PwaRegister() {
       return;
     }
 
-    const registerServiceWorker = () => {
-      navigator.serviceWorker.register("/sw.js").catch(() => {
-        // PWA installation remains optional if service-worker registration fails.
-      });
-    };
-
-    if (document.readyState === "complete") {
-      registerServiceWorker();
-    } else {
-      window.addEventListener("load", registerServiceWorker);
-      return () => {
-        window.removeEventListener("load", registerServiceWorker);
-      };
-    }
+    // Registration runs in the background and does not block page rendering.
+    void navigator.serviceWorker.register("/sw.js").catch(() => {
+      // PWA installation remains optional if registration fails.
+    });
   }, []);
 
   return null;

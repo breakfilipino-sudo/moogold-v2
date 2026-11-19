@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -272,11 +273,7 @@ export default function LocalWealthFundingForm({
 
     const returnUrl = `/dashboard/wealth-box/invest?planId=${encodeURIComponent(planId)}&amount=${encodeURIComponent(amount)}`;
 
-    const timeout = window.setTimeout(() => {
-      router.replace(returnUrl);
-    }, 30 * 1000);
-
-    return () => window.clearTimeout(timeout);
+    router.replace(returnUrl);
   }, [method, expired, router, storageKey, planId, amount]);
 
   if (method === "GCASH" && expired) {
@@ -333,23 +330,36 @@ export default function LocalWealthFundingForm({
           {payment.description}
         </p>
 
-        <div className="mt-6 flex flex-col items-center gap-3">
-          <span className="inline-flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-slate-600">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-            {creating ? "Please wait" : "Please wait"}
-          </span>
-
-          <div
-            className="h-1.5 w-36 overflow-hidden rounded-full bg-slate-100"
-            aria-label="Preparing secure payment"
-          >
-            <div className="h-full w-1/2 animate-pulse rounded-full bg-emerald-600" />
+        {method === "GCASH" ? (
+          <div className="mt-7 flex items-center justify-center gap-3 rounded-2xl bg-[#F0F6FF] px-4 py-4">
+            <LoaderCircle
+              className="h-5 w-5 animate-spin text-[#0064D2]"
+              strokeWidth={2.5}
+              aria-hidden="true"
+            />
+            <span className="text-sm font-semibold text-[#15569B]">
+              Please wait
+            </span>
           </div>
+        ) : (
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <span className="inline-flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-slate-600">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+              Please wait
+            </span>
 
-          <p className="text-xs font-semibold text-slate-400">
-            {payment.footer}
-          </p>
-        </div>
+            <div
+              className="h-1.5 w-36 overflow-hidden rounded-full bg-slate-100"
+              aria-label="Preparing secure payment"
+            >
+              <div className="h-full w-1/2 animate-pulse rounded-full bg-emerald-600" />
+            </div>
+
+            <p className="text-xs font-semibold text-slate-400">
+              {payment.footer}
+            </p>
+          </div>
+        )}
       </div>
 
       {error && (

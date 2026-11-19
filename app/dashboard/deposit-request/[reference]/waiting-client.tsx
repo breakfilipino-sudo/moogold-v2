@@ -56,11 +56,7 @@ export default function EwalletWaitingClient({
   useEffect(() => {
     if (!expired || !isGcash) return;
 
-    const timeout = window.setTimeout(() => {
-      window.location.replace("/dashboard/deposit");
-    }, 30 * 1000);
-
-    return () => window.clearTimeout(timeout);
+    window.location.replace("/dashboard/deposit");
   }, [expired, isGcash]);
 
   useEffect(() => {

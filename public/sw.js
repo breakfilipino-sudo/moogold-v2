@@ -162,7 +162,7 @@ async function handleNavigation(request) {
   const url = new URL(request.url);
 
   try {
-    const response = await fetch(request);
+    const response = await fetch(new Request(request, { redirect: "follow" }));
 
     // Cache only the successful public root page.
     // Do not cache redirects, login pages, or private dashboard pages.
@@ -211,6 +211,18 @@ async function handleNavigation(request) {
 
 async function handleAsset(request) {
   const cache = await caches.open(CACHE_NAME);
+  const url = new URL(request.url);
+  const isVersionedNextAsset = url.pathname.startsWith("/_next/static/");
+
+  // Next.js static assets are content-versioned, so cached copies
+  // can be reused immediately on repeat launches.
+  if (isVersionedNextAsset) {
+    const cached = await cache.match(request);
+
+    if (cached) {
+      return cached;
+    }
+  }
 
   try {
     const response = await fetch(request);

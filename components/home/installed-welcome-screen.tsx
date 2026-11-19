@@ -274,7 +274,7 @@ export default function InstalledWelcomeScreen({
             width={160}
             height={160}
             priority
-            className="h-8 w-8 object-contain sm:h-10 sm:w-10"
+            className="h-14 w-14 object-contain sm:h-16 sm:w-16"
           />
         </div>
         <div>
