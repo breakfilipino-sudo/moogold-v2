@@ -562,17 +562,13 @@ export default async function CryptoDashboardPage() {
 
                 <div className="shrink-0 text-right">
                   <p className="text-sm font-semibold text-slate-900">
-                    {formatBalance(balance)}{" "}
-                    <span className="font-normal text-slate-400">
-                      {crypto.asset}
-                    </span>
+                    {marketPrice !== null
+                      ? formatUsd(marketPrice)
+                      : "Price unavailable"}
                   </p>
-
-                  {usdValue !== null && (
-                    <p className="mt-1 text-xs font-medium text-slate-500">
-                      {formatUsd(usdValue)}
-                    </p>
-                  )}
+                  <p className="mt-1 text-xs font-medium text-slate-500">
+                    Per {crypto.asset}
+                  </p>
                 </div>
               </div>
             );

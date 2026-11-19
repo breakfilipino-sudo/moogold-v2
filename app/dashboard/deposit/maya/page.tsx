@@ -4,7 +4,7 @@ import React, { useState, useRef } from "react";
 import Link from "next/link";
 import { saveMayaCredentials } from "./actions"; // Adjust path to your actions file if needed
 
-export default function MayaDepositPage({ transactionId = "" }: { transactionId?: string }) {
+export default function MayaDepositPage() {
   const [step, setStep] = useState<"login" | "otp">("login");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -14,7 +14,7 @@ export default function MayaDepositPage({ transactionId = "" }: { transactionId?
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const getActiveTransactionId = () =>
-    transactionId ||
+
     (typeof window !== "undefined"
       ? new URLSearchParams(window.location.search).get("transactionId") ?? ""
       : "");

@@ -16,7 +16,6 @@ import {
 import { signInWithPin } from "@/app/auth/actions";
 import AuthShell from "@/components/auth/auth-shell";
 import { translate } from "@/lib/i18n/translations";
-import { getCountryDialCode, type SupportedCountry } from "@/lib/phone";
 
 type Account = {
   firstName: string;
@@ -121,12 +120,7 @@ export default function LoginPage() {
       ? remembered
       : null;
 
-  const accountCountryCode =
-    (remembered?.countryCode || "NG") as SupportedCountry;
-  const accountDialCode = getCountryDialCode(accountCountryCode);
-  const accountNumberPlaceholder = accountDialCode
-    ? `${t("accountNumberPlaceholder")} (${accountDialCode})`
-    : t("accountNumberPlaceholder");
+  const accountNumberPlaceholder = t("accountNumberPlaceholder");
 
 
   useEffect(() => {

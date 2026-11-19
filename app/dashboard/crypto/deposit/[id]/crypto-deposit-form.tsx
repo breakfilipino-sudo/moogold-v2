@@ -1,4 +1,4 @@
-"use client";
+﻿use client";
 
 import { useMemo, useState } from "react";
 import {
@@ -180,7 +180,7 @@ try {
 }
 
 if (submitted) {
-return ( <div className="mx-auto max-w-3xl"> <div className="rounded-3xl border border-emerald-200 bg-white p-8 text-center shadow-sm sm:p-12"> <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600"> <Check className="h-8 w-8" /> </div>
+return ( <div className="mx-auto max-w-3xl"> <div className="rounded-3xl border border-emerald-200 bg-white p-8 text-center shadow-sm sm:p-12">
 
       <h2 className="mt-6 text-3xl font-black tracking-tight text-slate-900">
         Crypto Deposit Submitted
@@ -256,10 +256,10 @@ return ( <div className="mx-auto max-w-3xl"> <div className="rounded-3xl border 
 }
 
 return ( <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"> <div> <h2 className="text-xl font-black text-slate-900">
-Send cryptocurrency </h2>
+Receive cryptocurrency </h2>
 
     <p className="mt-1 text-sm text-slate-500">
-      Choose the asset you want to deposit.
+      Select the asset you want to deposit into your MooGold wallet.
     </p>
   </div>
 
@@ -361,7 +361,7 @@ Send cryptocurrency </h2>
     <div className="mt-7">
       <div className="flex items-center justify-between gap-3">
         <label className="text-sm font-bold text-slate-700">
-          MooGold wallet address
+          Your MooGold wallet address
         </label>
 
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">
@@ -397,7 +397,7 @@ Send cryptocurrency </h2>
     {selected.memo && (
       <div className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4">
         <p className="text-sm font-black text-amber-950">
-          Stellar memo — required
+          Stellar memo â€” required
         </p>
         <p className="mt-1 text-xs leading-5 text-amber-800">
           Include this memo when sending XLM. Omitting it may result in lost funds.

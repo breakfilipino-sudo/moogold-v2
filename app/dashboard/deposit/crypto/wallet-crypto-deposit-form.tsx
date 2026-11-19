@@ -160,7 +160,7 @@ export default function WalletCryptoDepositForm({
           <ShieldCheck className="h-5 w-5" />
         </div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
-          Fund your main wallet with Crypto
+          Cash in with Crypto
         </h1>
       </div>
 

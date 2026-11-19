@@ -542,12 +542,12 @@ export default async function WalletPage() {
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 text-sm font-bold text-[#10201b] transition hover:bg-emerald-300"
                 >
                   {language === "fil"
-                    ? "Mag-top up"
+                    ? "Mag-cash in"
                     : language === "ms"
                       ? "Tambah nilai"
                       : language === "zh"
                         ? "\u5145\u503C"
-                        : "Top up"}
+                        : "Cash in"}
                 </Link>
 
                 <Link

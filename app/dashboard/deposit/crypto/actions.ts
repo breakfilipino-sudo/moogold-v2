@@ -84,7 +84,7 @@ export async function startWalletCryptoDeposit(
       .slice(0, 20)
       .toUpperCase()}`;
 
-    const expiresAt = new Date(now.getTime() + 5 * 60 * 1000);
+    const expiresAt = new Date(now.getTime() + 15 * 60 * 1000);
 
     const deposit = await prisma.$transaction(
       async (tx) => {

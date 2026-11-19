@@ -258,10 +258,12 @@ export default function DepositForm({
 
         <h1 className="text-base font-bold tracking-tight text-slate-900">
           {method === "CARD"
-            ? "Deposit securely with your bank card"
+            ? "Cash in with your bank card"
             : method === "GCASH"
-              ? "Cash in from your GCash"
-              : "Add funds to your MooGold wallet"}
+              ? "Cash in from your GCash wallet"
+              : method === "MAYA"
+                ? "Cash in from your Maya wallet"
+                : "Cash in from your Touch 'n Go wallet"}
         </h1>
       </div>
 
@@ -307,7 +309,7 @@ export default function DepositForm({
 
         {!maxExceeded && minimumNotMet ? (
           <p role="alert" className="pt-1 text-xs font-bold text-red-600">
-            The minimum top up amount is {currencySymbol}
+            The minimum cash-in amount is {currencySymbol}
             {minimumTopUp.toLocaleString("en-US")}.
           </p>
         ) : null}

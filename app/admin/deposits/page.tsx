@@ -1,4 +1,4 @@
-import {
+﻿import {
   ArrowLeft,
   Clock3,
   ExternalLink,
@@ -45,6 +45,8 @@ function getStatusClasses(status: string) {
       return "bg-amber-100 text-amber-700";
   }
 }
+
+export const dynamic = "force-dynamic";
 
 export default async function AdminDepositsPage() {
   const deposits = await prisma.transaction.findMany({
@@ -310,7 +312,7 @@ export default async function AdminDepositsPage() {
                           </p>
 
                           <p className="mt-1 text-xs text-slate-400">
-                            {deposit.currency} → USD
+                            {deposit.currency} â†’ USD
                           </p>
                         </td>
 

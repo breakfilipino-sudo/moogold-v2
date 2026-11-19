@@ -1,8 +1,6 @@
 import {
   ArrowLeft,
   ArrowRight,
-  CreditCard,
-  WalletCards,
 } from "lucide-react";
 import Link from "next/link";
 import { cookies } from "next/headers";
@@ -52,7 +50,7 @@ const LABELS: Record<
     paymentMethod: "Payment method",
     cardDescription: "Visa, Mastercard and more",
     back: "Back",
-    continue: "Continue to Add Fund",
+    continue: "Continue to Cash In",
   },
   fil: {
     wallet: "Wallet",
@@ -166,11 +164,6 @@ export default async function DepositReviewPage({
     ? Number(deposit.usdAmount)
     : null;
 
-  const accountName =
-    user.fullName ||
-    user.email?.split("@")[0] ||
-    "MooGold User";
-
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-slate-950/50 p-3 pt-6 backdrop-blur-sm sm:items-center sm:p-6">
       <div className="relative my-auto w-full max-w-lg rounded-2xl bg-white p-3 shadow-2xl ring-1 ring-black/10 sm:p-5">
@@ -188,25 +181,6 @@ export default async function DepositReviewPage({
 
       {/* Main card */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        {/* Account */}
-        <div className="border-b border-slate-100 px-4 py-3.5">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
-              <WalletCards className="h-4 w-4 text-emerald-600" />
-            </div>
-
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                {t.account}
-              </p>
-
-              <p className="mt-0.5 truncate text-sm font-black text-slate-900">
-                {accountName}
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Amount */}
         <div className="px-4 py-5 text-center">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -224,40 +198,6 @@ export default async function DepositReviewPage({
           )}
         </div>
 
-        {/* Payment method */}
-        <div className="border-t border-slate-100 px-4 py-3.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            {t.paymentMethod}
-          </p>
-
-          <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm">
-                <CreditCard className="h-4 w-4 text-slate-700" />
-              </div>
-
-              <div className="min-w-0">
-                <p className="text-xs font-black text-slate-900">
-                  Credit / Debit Card
-                </p>
-
-                <p className="mt-0.5 text-[10px] font-medium text-slate-500">
-                  {t.cardDescription}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-1">
-              <span className="flex h-6 w-8 items-center justify-center rounded border border-slate-200 bg-white text-[8px] font-black italic text-blue-700">
-                VISA
-              </span>
-
-              <span className="flex h-6 w-8 items-center justify-center rounded border border-slate-200 bg-white text-[7px] font-black text-red-600">
-                MC
-              </span>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Actions */}
@@ -265,7 +205,7 @@ export default async function DepositReviewPage({
 
         <a
           href={`/dashboard/deposit/${reference}/special-card`}
-          className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-5 text-xs font-black text-white shadow-md shadow-emerald-600/15 transition hover:bg-emerald-700 sm:flex-[1.5]"
+          className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-4 text-sm font-black text-white shadow-lg shadow-emerald-600/25 ring-1 ring-emerald-700/20 transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/30 active:scale-[0.99]"
         >
           {t.continue}
           <ArrowRight className="h-3.5 w-3.5" />

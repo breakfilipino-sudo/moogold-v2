@@ -29,7 +29,7 @@ export default async function DepositMethodPage() {
   const methods: DepositMethodOption[] = [
     {
       name: "Credit/Debit Card",
-      description: "Deposit securely with your bank card",
+      description: "Cash in with your bank card",
       href: "/dashboard/deposit",
       logo: {
         src: "/images/card.png",
@@ -40,7 +40,7 @@ export default async function DepositMethodPage() {
     },
     {
       name: "Cryptocurrency",
-      description: "Deposit using supported digital currencies",
+      description: "Cash in with supported cryptocurrencies",
       href: "/dashboard/deposit/crypto",
       logo: {
         src: "/images/bitcoin.svg",
@@ -53,7 +53,7 @@ export default async function DepositMethodPage() {
       ? [
           {
             name: "GCash",
-            description: "Deposit directly from your GCash wallet",
+            description: "Cash in from your GCash wallet",
             href: "/dashboard/deposit/gcash",
             logo: {
               src: "/images/gcash.svg",
@@ -64,7 +64,7 @@ export default async function DepositMethodPage() {
           },
           {
             name: "Maya",
-            description: "Deposit directly from your Maya wallet",
+            description: "Cash in from your Maya wallet",
             href: "/dashboard/deposit/maya/start",
             logo: {
               src: "/images/maya.jpg",
@@ -79,7 +79,7 @@ export default async function DepositMethodPage() {
       ? [
           {
             name: "Touch 'n Go",
-            description: "Deposit using your Touch 'n Go wallet",
+            description: "Cash in from your Touch 'n Go wallet",
             href: "/dashboard/deposit/touch-n-go",
             logo: {
               src: "/images/touch-n-go.svg",
@@ -103,11 +103,11 @@ export default async function DepositMethodPage() {
         </Link>
 
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-950">
-            Choose deposit method
+          <h1 className="text-lg font-black tracking-tight text-slate-950">
+            Choose a cash-in method
           </h1>
           <p className="mt-1 text-sm font-medium text-slate-500">
-            Select how you want to add money to your wallet.
+            Choose how you want to cash in to your wallet.
           </p>
         </div>
       </div>

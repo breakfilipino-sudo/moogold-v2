@@ -224,7 +224,6 @@ export async function submitCryptoDeposit(formData: FormData) {
     where: {
       authUserId: authUser.id,
     },
-
     select: {
       id: true,
     },
@@ -256,18 +255,6 @@ export async function submitCryptoDeposit(formData: FormData) {
     };
   }
 
-  /*
-   * MooGold uses the existing shared receiving wallet
-   * for each supported asset/network.
-   *
-   * The customer does not submit an amount.
-   *
-   * The actual amount is determined from the crypto
-   * transaction received by MooGold and verified by
-   * the admin/blockchain verification process.
-   */
-
-
   try {
     const deposit = await prisma.$transaction(async (tx) => {
       const cryptoBalance = await tx.cryptoBalance.upsert({
@@ -278,9 +265,7 @@ export async function submitCryptoDeposit(formData: FormData) {
             network: cryptoOption.network,
           },
         },
-
         update: {},
-
         create: {
           userId: user.id,
           asset: assetInput,
@@ -292,31 +277,16 @@ export async function submitCryptoDeposit(formData: FormData) {
       return tx.cryptoDeposit.create({
         data: {
           userId: user.id,
-
           cryptoBalanceId: cryptoBalance.id,
-
           asset: assetInput,
-
           network: cryptoOption.network,
-
-          /*
-           * Amount intentionally omitted.
-           *
-           * It will be populated when the incoming blockchain
-           * transaction is identified and verified.
-           */
-
           receivingAddress: cryptoOption.address,
           memo: expectedMemo,
-
           status: "PENDING",
-
           description:
-            `Customer reported sending ${assetInput} ` +
-            `via ${cryptoOption.networkLabel}. ` +
-            `Awaiting MooGold wallet verification.`,
+            `Customer started a 15-minute ${assetInput} deposit window ` +
+            `via ${cryptoOption.networkLabel}. Awaiting incoming funds and manual verification.`,
         },
-
         select: {
           id: true,
           asset: true,
@@ -331,41 +301,31 @@ export async function submitCryptoDeposit(formData: FormData) {
     });
 
     void sendAdminEmailAlert({
-      subject: "Crypto deposit awaiting verification",
+      subject: "Crypto deposit window started",
       message:
-        `A new crypto deposit report needs admin verification.\n` +
+        `A customer started a 15-minute crypto deposit window.\n` +
         `Request ID: ${deposit.id}\n` +
         `Asset: ${deposit.asset}\n` +
         `Network: ${deposit.network}\n` +
         `Status: ${deposit.status}\n` +
-        `Verify the received amount before crediting.`,
+        `The customer has not confirmed that funds were sent. Check the blockchain manually. Credit only after the incoming transaction and amount are verified and the deposit is approved.`,
     });
+
     return {
       success: true,
-
       deposit: {
         id: deposit.id,
-
         asset: deposit.asset,
-
         network: deposit.network,
-
         amount: deposit.amount?.toString() ?? null,
-
         receivingAddress: deposit.receivingAddress,
-
         memo: deposit.memo,
-
         status: deposit.status,
-
         createdAt: deposit.createdAt.toISOString(),
       },
     };
   } catch (error) {
-    console.error(
-      "Failed to create crypto deposit:",
-      error,
-    );
+    console.error("Failed to create crypto deposit:", error);
 
     return {
       success: false,

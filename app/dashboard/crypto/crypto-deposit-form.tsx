@@ -1,519 +1,437 @@
-"use client";
+﻿use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   Check,
   Copy,
+  Info,
 } from "lucide-react";
 
 import { submitCryptoDeposit } from "@/app/dashboard/crypto/actions";
 
 const CRYPTO_OPTIONS = [
   {
-    asset: "BTC",
-    network: "BITCOIN",
-    networkLabel: "Bitcoin",
-    address: "16GZmP9ybu1m1wYvzG5D4Q6aCrxn3ebYgU",
-  },
-  {
     asset: "USDT",
-    network: "TRON",
-    networkLabel: "Tron (TRC-20)",
+    network: "Tron (TRC20)",
+    networkKey: "TRON",
     address: "TJKxnXkwhH8fC9qY9g8YXvCoHSqyZ1oR12",
-  },
-  {
-    asset: "BNB",
-    network: "BNB_SMART_CHAIN",
-    networkLabel: "BNB Smart Chain (BEP-20)",
-    address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
-  },
-  {
-    asset: "ETH",
-    network: "ETHEREUM",
-    networkLabel: "Ethereum (ERC-20)",
-    address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+    memo: undefined,
   },
   {
     asset: "USDC",
-    network: "ETHEREUM",
-    networkLabel: "Ethereum (ERC-20)",
+    network: "Ethereum (ERC20)",
+    networkKey: "ETHEREUM",
     address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+    memo: undefined,
+  },
+  {
+    asset: "BTC",
+    network: "Bitcoin",
+    networkKey: "BITCOIN",
+    address: "16GZmP9ybu1m1wYvzG5D4Q6aCrxn3ebYgU",
+    memo: undefined,
+  },
+  {
+    asset: "BNB",
+    network: "BNB Smart Chain (BEP20)",
+    networkKey: "BNB_SMART_CHAIN",
+    address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+    memo: undefined,
+  },
+  {
+    asset: "ETH",
+    network: "Ethereum (ERC20)",
+    networkKey: "ETHEREUM",
+    address: "0x4f8179631d4af8e05ae09b1182813ee65d421918",
+    memo: undefined,
   },
   {
     asset: "SOL",
-    network: "SOLANA",
-    networkLabel: "Solana",
+    network: "Solana",
+    networkKey: "SOLANA",
     address: "orwuXMAC81ivmAKR5X4oB4hpvRzmfE7jSUXdrjQYgkv",
+    memo: undefined,
   },
   {
     asset: "XLM",
-    network: "STELLAR",
-    networkLabel: "Stellar",
+    network: "Stellar",
+    networkKey: "STELLAR",
     address: "GABFQIK63R2NETJM7T673EAMZN4RJLLGP3OFUEJU5SZVTGWUKULZJNL6",
     memo: "401607474",
   },
   {
     asset: "TRX",
-    network: "TRON",
-    networkLabel: "Tron (TRC-20)",
+    network: "Tron (TRC20)",
+    networkKey: "TRON",
     address: "TJKxnXkwhH8fC9qY9g8YXvCoHSqyZ1oR12",
+    memo: undefined,
   },
   {
     asset: "SUI",
-    network: "SUI",
-    networkLabel: "Sui",
+    network: "Sui",
+    networkKey: "SUI",
     address: "0xfe65cba4a2b4f67b13e68c548460d129fa0b0b9cae6f6e2d5d8ce0adaa94c8ab",
+    memo: undefined,
   },
 ] as const;
 
+const DEPOSIT_WINDOW_SECONDS = 15 * 60;
+
 export default function CryptoDepositForm() {
-  const [selectedAsset, setSelectedAsset] =
-    useState("USDT");
+  const [selectedAsset, setSelectedAsset] = useState("USDT");
   const [copied, setCopied] = useState(false);
   const [memoCopied, setMemoCopied] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [depositCreatedAt, setDepositCreatedAt] = useState<string | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState(
+    DEPOSIT_WINDOW_SECONDS,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [helpOpen, setHelpOpen] = useState(false);
 
   const selected = useMemo(
     () =>
-      CRYPTO_OPTIONS.find(
-        (item) => item.asset === selectedAsset,
-      ) ?? CRYPTO_OPTIONS[0],
+      CRYPTO_OPTIONS.find((crypto) => crypto.asset === selectedAsset) ??
+      CRYPTO_OPTIONS[0],
     [selectedAsset],
   );
 
-  const selectedMemo = "memo" in selected ? selected.memo : null;
+  useEffect(() => {
+    if (!submitted || !depositCreatedAt) return;
+
+    const updateCountdown = () => {
+      const expiresAt =
+        new Date(depositCreatedAt).getTime() +
+        DEPOSIT_WINDOW_SECONDS * 1000;
+
+      setRemainingSeconds(
+        Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)),
+      );
+    };
+
+    updateCountdown();
+
+    const interval = window.setInterval(updateCountdown, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [submitted, depositCreatedAt]);
+
+  async function copyAddress() {
+    try {
+      await navigator.clipboard.writeText(selected.address);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("Unable to copy the wallet address. Please copy it manually.");
+    }
+  }
 
   async function copyMemo() {
-    if (!selectedMemo) return;
+    if (!selected.memo) return;
 
     try {
-      if (
-        typeof navigator !== "undefined" &&
-        navigator.clipboard &&
-        window.isSecureContext
-      ) {
-        await navigator.clipboard.writeText(selectedMemo);
-      } else {
-        const textArea = document.createElement("textarea");
-        textArea.value = selectedMemo;
-        textArea.setAttribute("readonly", "");
-        textArea.style.position = "fixed";
-        textArea.style.left = "-9999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        const copiedSuccessfully = document.execCommand("copy");
-        document.body.removeChild(textArea);
-
-        if (!copiedSuccessfully) {
-          throw new Error("Copy command failed");
-        }
-      }
-
-      setError("");
+      await navigator.clipboard.writeText(selected.memo);
       setMemoCopied(true);
       window.setTimeout(() => setMemoCopied(false), 2000);
     } catch {
-      setError("Unable to copy memo. Please copy it manually.");
+      setError("Unable to copy the Stellar memo. Please copy it manually.");
     }
   }
 
-  async function copyAddress() {
-    const address = selected.address;
-
-    try {
-      if (
-        typeof navigator !== "undefined" &&
-        navigator.clipboard &&
-        window.isSecureContext
-      ) {
-        await navigator.clipboard.writeText(address);
-      } else {
-        const textArea =
-          document.createElement("textarea");
-
-        textArea.value = address;
-        textArea.setAttribute("readonly", "");
-        textArea.style.position = "fixed";
-        textArea.style.left = "-9999px";
-        textArea.style.top = "0";
-
-        document.body.appendChild(textArea);
-
-        textArea.focus();
-        textArea.select();
-
-        const copiedSuccessfully =
-          document.execCommand("copy");
-
-        document.body.removeChild(textArea);
-
-        if (!copiedSuccessfully) {
-          throw new Error("Copy command failed");
-        }
-      }
-
-      setError("");
-      setCopied(true);
-
-      window.setTimeout(() => {
-        setCopied(false);
-      }, 2000);
-    } catch {
-      setError(
-        "Unable to copy address. Please copy it manually.",
-      );
-    }
-  }
-
-  async function handleSubmit(
-    event: React.FormEvent<HTMLFormElement>,
-  ) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     setError("");
     setLoading(true);
 
     try {
       const formData = new FormData();
-
       formData.set("asset", selected.asset);
-      if (selectedMemo) formData.set("memo", selectedMemo);
+      formData.set("memo", selected.memo ?? "");
 
-      const result =
-        await submitCryptoDeposit(formData);
+      const result = await submitCryptoDeposit(formData);
 
-      if (!result.success) {
+      if (!result.success || !result.deposit) {
         setError(
-          result.error ?? "Unable to submit deposit.",
+          result.error ?? "We could not start your crypto deposit.",
         );
         return;
       }
 
+      setDepositCreatedAt(result.deposit.createdAt);
+      setRemainingSeconds(DEPOSIT_WINDOW_SECONDS);
       setSubmitted(true);
-    } catch {
-      setError(
-        "Unable to submit deposit. Please try again.",
-      );
+    } catch (error) {
+      console.error("Crypto deposit submission error:", error);
+      setError("We could not start your crypto deposit. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
+  function startAnotherDeposit() {
+    setSubmitted(false);
+    setDepositCreatedAt(null);
+    setRemainingSeconds(DEPOSIT_WINDOW_SECONDS);
+    setCopied(false);
+    setMemoCopied(false);
+    setError("");
+  }
+
   if (submitted) {
+    const minutes = Math.floor(remainingSeconds / 60)
+      .toString()
+      .padStart(2, "0");
+    const seconds = (remainingSeconds % 60)
+      .toString()
+      .padStart(2, "0");
+
     return (
-      <div className="rounded-3xl border border-emerald-100 bg-gradient-to-b from-emerald-50/80 via-white to-white p-5 text-center shadow-[0_18px_48px_-32px_rgba(6,95,70,0.45)] sm:p-7">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-700 to-emerald-500 text-white shadow-lg shadow-emerald-900/15">
-          <Check className="h-6 w-6" />
+      <div className="mx-auto max-w-3xl">
+        <div className="rounded-3xl border border-emerald-200 bg-white p-6 shadow-sm sm:p-9">
+          <div className="text-center">
+
+
+            <h2 className="mt-5 text-2xl font-black tracking-tight text-slate-900">
+              Deposit window started
+            </h2>
+
+
+            <div className="mx-auto mt-6 max-w-sm rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5">
+              <p className="text-sm font-semibold text-slate-600">
+                Time remaining
+              </p>
+              <p className="mt-1 font-mono text-4xl font-black tabular-nums text-emerald-800">
+                {minutes}:{seconds}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                15-minute transfer window
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-7 space-y-5 rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm text-slate-500">Asset</span>
+              <span className="font-bold text-slate-900">
+                {selected.asset}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm text-slate-500">Network</span>
+              <span className="text-right text-sm font-bold text-slate-900">
+                {selected.network}
+              </span>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-bold text-slate-800">
+                  Your MooGold wallet address
+                </p>
+                <button
+                  type="button"
+                  onClick={copyAddress}
+                  className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      Copy address
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <code className="mt-3 block break-all rounded-xl bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-800">
+                {selected.address}
+              </code>
+            </div>
+
+            {selected.memo && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-black text-amber-950">
+                    Stellar memo Ã¢â‚¬â€ required
+                  </p>
+                  <button
+                    type="button"
+                    onClick={copyMemo}
+                    className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-bold text-amber-950"
+                  >
+                    {memoCopied ? (
+                      <>
+                        <Check className="h-4 w-4" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4" />
+                        Copy memo
+                      </>
+                    )}
+                  </button>
+                </div>
+                <code className="mt-3 block rounded-lg bg-white p-3 text-center text-lg font-bold tracking-wider text-slate-900">
+                  {selected.memo}
+                </code>
+                <p className="mt-2 text-xs leading-5 text-amber-900">
+                  Include this exact memo when sending XLM. Omitting it may
+                  result in lost funds.
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-4 border-t border-slate-100 pt-4">
+              <span className="text-sm text-slate-500">Request status</span>
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                PENDING
+              </span>
+            </div>
+          </div>
+
+          {remainingSeconds === 0 && (
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+              Your 15-minute transfer window has ended. This does not cancel
+              any transaction already sent. If you have already sent crypto,
+              do not create another request for the same transfer. Contact
+              support if you need assistance.
+            </div>
+          )}
+
+          {remainingSeconds === 0 && (
+            <button
+              type="button"
+              onClick={startAnotherDeposit}
+              className="mt-6 w-full rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+            >
+              Start another deposit
+            </button>
+          )}
         </div>
-
-        <h3 className="mt-4 text-lg font-bold text-slate-900">
-          Deposit submitted
-        </h3>
-
-        <p className="mt-2 text-base leading-5 text-slate-600">
-          Your deposit report has been submitted. MooGold will review and verify the incoming transaction before crediting your crypto balance.
-        </p>
-
-        <div className="mt-5 space-y-3 rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm sm:p-5">
-          <div className="flex justify-between gap-4">
-            <span className="text-base text-slate-500">
-              Asset
-            </span>
-
-            <span className="text-base font-semibold text-slate-900">
-              {selected.asset}
-            </span>
-          </div>
-
-          <div className="mt-2 flex justify-between gap-4">
-            <span className="text-base text-slate-500">
-              Network
-            </span>
-
-            <span className="text-base font-semibold text-slate-900">
-              {selected.networkLabel}
-            </span>
-          </div>
-
-          <div className="mt-2 flex justify-between gap-4">
-            <span className="text-base text-slate-500">
-              Status
-            </span>
-
-            <span className="text-base font-semibold text-amber-600">
-              Processing
-            </span>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            setSubmitted(false);
-            setCopied(false);
-            setError("");
-          }}
-          className="mt-5 text-base font-semibold text-emerald-600 hover:text-emerald-700"
-        >
-          Make another deposit
-        </button>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      {/* Deposit instructions are available on demand. */}
-      <button
-        type="button"
-        onClick={() => setHelpOpen(true)}
-        className="flex w-full items-center justify-between rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50/80 via-white to-amber-50/50 px-4 py-4 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 sm:px-5"
-        aria-haspopup="dialog"
-        aria-label="How to deposit"
-      >
-        <span className="flex items-center gap-3">
-
-          <span>
-            <span className="block text-base font-semibold text-slate-900">
-              How to deposit
-            </span>
-            <span className="mt-0.5 block text-sm text-slate-500">
-              View deposit steps and network safety tips
-            </span>
-          </span>
-        </span>
-
-      </button>
-
-      {helpOpen && (
-        <div
-          className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-md sm:items-center sm:p-4"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setHelpOpen(false);
-            }
-          }}
-        >
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="crypto-deposit-help-title"
-            className="w-full max-w-lg overflow-hidden rounded-t-[28px] border border-white/70 bg-[#FCFDFC] shadow-[0_24px_90px_-24px_rgba(0,0,0,0.45)] sm:rounded-[24px]"
-          >
-            <div className="flex items-start justify-between border-b border-slate-100 px-5 py-5 sm:px-6">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald-700">
-                  Crypto deposits
-                </p>
-                <h3
-                  id="crypto-deposit-help-title"
-                  className="mt-1 text-xl font-semibold tracking-tight text-slate-950"
-                >
-                  How to deposit
-                </h3>
-                <p className="mt-1 text-base leading-5 text-slate-500">
-                  Follow these steps before sending funds.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setHelpOpen(false)}
-                className="ml-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-                aria-label="Close deposit instructions"
-              >
-                <span aria-hidden="true" className="text-2xl leading-none">×</span>
-              </button>
-            </div>
-
-            <div className="space-y-5 px-5 py-5 sm:px-6">
-              <ol className="space-y-4">
-                <li className="flex gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-base font-bold text-emerald-800">
-                    1
-                  </span>
-                  <div>
-                    <p className="text-base font-semibold text-slate-900">
-                      Select your crypto
-                    </p>
-                    <p className="mt-1 text-base leading-6 text-slate-600">
-                      Select the crypto asset and network you want to deposit.
-                    </p>
-                  </div>
-                </li>
-                <li className="flex gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-base font-bold text-emerald-800">
-                    2
-                  </span>
-                  <div>
-                    <p className="text-base font-semibold text-slate-900">
-                      Send to your MooGold address
-                    </p>
-                    <p className="mt-1 text-base leading-6 text-slate-600">
-                      Copy the funding address shown in the form and send crypto from your external wallet or exchange.
-                    </p>
-                  </div>
-                </li>
-              </ol>
-
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <p className="text-base font-semibold text-amber-950">
-                  Check the network carefully
-                </p>
-                <p className="mt-1 text-base leading-6 text-amber-900">
-                  Make sure the sending network matches the selected network exactly. Sending on the wrong network may result in permanent loss of funds.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setHelpOpen(false)}
-                className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-base font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
-              >
-                Got it
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-      {/* Asset / Network */}
-      <div className="mt-5">
-        <label
-          htmlFor="crypto-asset"
-          className="text-base font-semibold text-slate-700"
-        >
-          Asset / Network
-        </label>
-
-        <select
-          id="crypto-asset"
-          value={selectedAsset}
-          onChange={(event) => {
-            setSelectedAsset(event.target.value);
-            setCopied(false);
-            setError("");
-          }}
-          className="mt-2.5 w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-semibold text-slate-900 shadow-sm outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10"
-        >
-          {CRYPTO_OPTIONS.map((crypto) => (
-            <option
-              key={crypto.asset}
-              value={crypto.asset}
-            >
-              {crypto.asset} — {crypto.networkLabel}
-            </option>
-          ))}
-        </select>
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+      <div>
+        <h2 className="text-xl font-black text-slate-900">
+          Receive cryptocurrency
+        </h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Choose the crypto asset and network you want to deposit.
+        </p>
       </div>
 
-      {/* Address */}
-      <div className="mt-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="break-words text-sm font-semibold leading-5 text-slate-900 sm:text-base">
-              Your MooGold {selected.asset} funding address
-            </p>
+      <form onSubmit={handleSubmit} className="mt-7">
+        <div>
+          <label className="text-sm font-bold text-slate-700">
+            Asset
+          </label>
 
-            <p className="mt-1 text-sm text-slate-500">
-              {selected.networkLabel}
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {CRYPTO_OPTIONS.map((crypto) => {
+              const active = crypto.asset === selectedAsset;
+
+              return (
+                <button
+                  key={crypto.asset}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => {
+                    setSelectedAsset(crypto.asset);
+                    setCopied(false);
+                    setMemoCopied(false);
+                    setError("");
+                  }}
+                  className={`rounded-2xl border px-4 py-4 text-left transition ${
+                    active
+                      ? "border-emerald-500 bg-emerald-50 shadow-sm"
+                      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  <p
+                    className={`font-black ${
+                      active ? "text-emerald-700" : "text-slate-900"
+                    }`}
+                  >
+                    {crypto.asset}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    {crypto.network}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mt-7 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+          <div className="flex items-start gap-3">
+            <Info className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <div>
+              <p className="font-bold text-amber-950">
+                Verify the asset and network
+              </p>
+              <p className="mt-1 text-sm leading-6 text-amber-800">
+                Only send {selected.asset} using the{" "}
+                <strong>{selected.network}</strong> network. Using the wrong
+                asset or network can result in permanent loss of funds.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {selected.memo && (
+          <div className="mt-5 rounded-2xl border border-amber-300 bg-amber-50 p-4">
+            <p className="text-sm font-black text-amber-950">
+              Stellar memo required
+            </p>
+            <p className="mt-1 text-sm leading-5 text-amber-800">
+              You must include the exact memo displayed after starting your
+              deposit window. Omitting it may result in lost funds.
             </p>
           </div>
+        )}
 
-          <button
-            type="button"
-            onClick={copyAddress}
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3.5 py-2.5 text-sm font-bold text-emerald-800 shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+        {error && (
+          <div
+            role="alert"
+            className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold leading-6 text-red-700"
           >
-            {copied ? (
+            {error}
+          </div>
+        )}
+
+        <div className="mt-8 border-t border-slate-100 pt-7">
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+          >
+            {loading ? (
               <>
-                <Check className="h-3.5 w-3.5 text-emerald-600" />
-                Copied
+                <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                Starting deposit...
               </>
             ) : (
               <>
-                <Copy className="h-3.5 w-3.5" />
-                Copy
+                Start deposit
+                <ArrowRight className="h-5 w-5" />
               </>
             )}
           </button>
         </div>
+      </form>
 
-        <div className="mt-3 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 via-white to-amber-50/40 p-4 shadow-inner sm:p-5">
-          <code className="block break-all font-mono text-sm leading-6 text-slate-800 sm:text-base sm:leading-7">
-            {selected.address}
-          </code>
-        </div>
-      </div>
 
-      {selectedMemo && (
-        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-slate-900">
-                Stellar memo (required)
-              </p>
-              <p className="mt-1 text-xs leading-5 text-amber-800">
-                Include this exact memo when sending XLM. Deposits without it may not be identifiable.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={copyMemo}
-              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-amber-900 shadow-sm"
-            >
-              {memoCopied ? (
-                <>
-                  <Check className="h-3.5 w-3.5" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5" />
-                  Copy
-                </>
-              )}
-            </button>
-          </div>
-          <code className="mt-3 block rounded-xl bg-white px-3 py-3 text-center font-mono text-lg font-bold tracking-wider text-slate-900">
-            {selectedMemo}
-          </code>
-        </div>
-      )}
-      {/* Network speed */}
-      <div className="mt-4 flex gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-white px-4 py-4 shadow-sm">
-        <p className="text-base font-semibold leading-5 text-emerald-900">
-          Send only using the selected network. Crypto arrives in seconds depending on network.
-        </p>
-      </div>
-
-      {error && (
-        <div className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-base font-medium leading-5 text-red-600">
-          {error}
-        </div>
-      )}
-
-      {/* Submit */}
-      <button
-        type="submit"
-        disabled={loading}
-        className="mt-5 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-600 px-5 py-4 text-base font-bold text-white shadow-lg shadow-emerald-900/15 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-emerald-900/20 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-600/20 disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
-      >
-        {loading ? (
-          <>
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-            Checking...
-          </>
-        ) : (
-          <>
-            I&apos;ve Sent the Crypto
-            <ArrowRight className="h-4 w-4" />
-          </>
-        )}
-      </button>
-    </form>
+    </div>
   );
 }
